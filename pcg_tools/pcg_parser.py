@@ -1,0 +1,515 @@
+"""Proper PCG binary format parser based on original C# implementation."""
+
+import struct
+from typing import List, Tuple, Optional
+from .models import PcgFile, Program, Combi, Bank, Category
+
+
+# Enable debug output
+DEBUG = False
+
+def debug_print(msg):
+    """Print debug message if DEBUG is enabled."""
+    if DEBUG:
+        print(msg)
+
+
+class PcgBinaryParser:
+    """Parse PCG binary format properly."""
+    
+    def __init__(self, data: bytes):
+        self.data = data
+        self.index = 0
+    
+    def get_int(self, offset: int, size: int) -> int:
+        """Read integer from data (little-endian for size, big-endian for IDs)."""
+        if offset + size > len(self.data):
+            return 0
+        
+        # For 4-byte integers, use little-endian (Korg format)
+        if size == 4:
+            return struct.unpack('<I', self.data[offset:offset+4])[0]
+        
+        # For other sizes, use big-endian
+        value = 0
+        for i in range(size):
+            value += self.data[offset + i] * (256 ** (size - i - 1))
+        return value
+    
+    def get_string(self, offset: int, length: int) -> str:
+        """Read null-terminated ASCII string."""
+        string_data = self.data[offset:offset+length]
+        # Find null terminator
+        null_pos = string_data.find(b'\x00')
+        if null_pos >= 0:
+            string_data = string_data[:null_pos]
+        return string_data.decode('ascii', errors='ignore').strip()
+    
+    def find_chunk(self, chunk_id: bytes, start_offset: int = 16, search_inside_pcg1: bool = True) -> Optional[Tuple[int, int]]:
+        """Find a chunk by ID, returns (offset, size) or None."""
+        offset = start_offset
+        while offset < len(self.data) - 8:
+            current_id = self.data[offset:offset+4]
+            if current_id == chunk_id:
+                size = self.get_int(offset + 4, 4)
+                return (offset, size)
+            
+            # If looking for PRG1/CMB1 and we found PCG1, search inside it
+            if search_inside_pcg1 and current_id == b'PCG1' and chunk_id in [b'PRG1', b'CMB1']:
+                size = self.get_int(offset + 4, 4)
+                # Search inside PCG1 chunk
+                result = self.find_chunk(chunk_id, offset + 8, search_inside_pcg1=False)
+                if result:
+                    return result
+            
+            # Skip this chunk
+            if len(current_id) == 4:
+                try:
+                    size = self.get_int(offset + 4, 4)
+                    offset += 8 + size
+                    # Align to 4 bytes
+                    if offset % 4:
+                        offset += 4 - (offset % 4)
+                except:
+                    break
+            else:
+                break
+        
+        return None
+    
+    def parse_prg1_chunk(self, pcg: PcgFile):
+        """Parse PRG1 chunk containing program banks."""
+        # Search for PRG1 anywhere in the file
+        prg1_offset = self.data.find(b'PRG1')
+        if prg1_offset < 0:
+            debug_print("PRG1 chunk not found")
+            return
+        
+        offset = prg1_offset
+        chunk_size = self.get_int(offset + 4, 4)
+        debug_print(f"Found PRG1 at offset {offset:08X}, size {chunk_size:08X}")
+        
+        chunk_end = offset + 8 + chunk_size
+        offset += 12  # Skip chunk header (8) + gap (4)
+        
+        while offset < chunk_end - 8 and offset < len(self.data) - 8:
+            sub_id = self.data[offset:offset+4]
+            debug_print(f"At offset {offset:08X}, found sub-chunk: {sub_id}")
+            
+            if sub_id == b'PBK1':
+                offset = self._parse_pbk1_chunk(pcg, offset)
+            elif sub_id == b'MBK1':
+                offset = self._parse_mbk1_chunk(pcg, offset)
+            else:
+                # Skip unknown chunk
+                try:
+                    size = self.get_int(offset + 4, 4)
+                    debug_print(f"Skipping unknown chunk {sub_id}, size {size}")
+                    offset += 8 + size + 12
+                except:
+                    break
+    
+    def _parse_pbk1_chunk(self, pcg: PcgFile, offset: int) -> int:
+        """Parse a PBK1 (Program Bank) chunk."""
+        chunk_size = self.get_int(offset + 4, 4)
+        start_offset = offset
+        
+        debug_print(f"Parsing PBK1 at {offset:08X}, size {chunk_size:08X}")
+        
+        # Read bank info
+        offset += 12  # Skip to number of programs
+        num_programs = self.get_int(offset, 4)
+        offset += 4
+        program_size = self.get_int(offset, 4)
+        offset += 4
+        bank_id_raw = self.get_int(offset, 4)
+        offset += 4
+        
+        debug_print(f"  Bank ID raw: {bank_id_raw:08X}, Programs: {num_programs}, Size: {program_size}")
+        
+        # Decode bank ID
+        bank_name = self._decode_bank_id(bank_id_raw, is_combi=False)
+        debug_print(f"  Decoded bank name: {bank_name}")
+        
+        # Create bank
+        bank = Bank(bank_id=bank_name, bank_type='Program')
+        
+        # Read programs
+        for i in range(min(num_programs, 128)):  # Max 128 per bank
+            if offset + program_size > len(self.data):
+                debug_print(f"  Reached end of data at program {i}")
+                break
+            
+            # Program name is typically at offset 0 within the program data, 24 bytes
+            name = self.get_string(offset, 24)
+            if not name or len(name) < 2:
+                name = f"[Empty {i:03d}]"
+            
+            if i < 3:  # Debug first 3 programs
+                debug_print(f"  Program {i}: {name}")
+            
+            program = Program(
+                bank=bank_name,
+                index=i,
+                name=name,
+                raw_data=self.data[offset:offset+program_size]
+            )
+            
+            bank.patches.append(program)
+            offset += program_size
+        
+        if bank.patches:  # Only add if we found programs
+            pcg.program_banks.append(bank)
+            debug_print(f"  Added bank {bank_name} with {len(bank.patches)} programs")
+        
+        return start_offset + 8 + chunk_size + 12
+    
+    def _parse_mbk1_chunk(self, pcg: PcgFile, offset: int) -> int:
+        """Parse an MBK1 (Model Bank - for special synthesis types) chunk."""
+        chunk_size = self.get_int(offset + 4, 4)
+        start_offset = offset
+        
+        debug_print(f"Parsing MBK1 at {offset:08X}, size {chunk_size:08X}")
+        
+        # MBK1 header structure varies - try both +24 and +32 offsets
+        # Some files have programs at +24, others at +32
+        program_size = 4960  # Kronos program size
+        programs = []
+        
+        # Try offset +24 first (older format)
+        scan_offset = offset + 24
+        for i in range(128):
+            if scan_offset + 24 > len(self.data):
+                break
+            name = self.get_string(scan_offset, 24)
+            if name and len(name) >= 3 and name.isprintable():
+                programs.append((i, name, scan_offset))
+                if i < 3:
+                    debug_print(f"  Found program {i} at +24: {name}")
+                scan_offset += program_size
+            else:
+                break
+        
+        # If no programs found at +24, try +32 (newer format)
+        if not programs:
+            scan_offset = offset + 32
+            for i in range(128):
+                if scan_offset + 24 > len(self.data):
+                    break
+                name = self.get_string(scan_offset, 24)
+                if name and len(name) >= 3 and name.isprintable():
+                    programs.append((i, name, scan_offset))
+                    if i < 3:
+                        debug_print(f"  Found program {i} at +32: {name}")
+                    scan_offset += program_size
+                else:
+                    break
+        
+        if programs:
+            # Decode bank ID from the chunk data (at offset +20 from data start, after 8-byte header = +28 total)
+            bank_id_raw = self.get_int(start_offset + 28, 4)
+            bank_id = self._decode_bank_id(bank_id_raw, is_combi=False)
+            debug_print(f"  Decoded bank ID: {bank_id} (raw: {bank_id_raw:08X})")
+            
+            # Create bank
+            bank = Bank(bank_id=bank_id, bank_type='Program')
+            
+            for idx, name, prog_offset in programs:
+                program = Program(
+                    bank=bank_id,
+                    index=idx,
+                    name=name,
+                    raw_data=self.data[prog_offset:prog_offset+program_size]
+                )
+                bank.patches.append(program)
+            
+            pcg.program_banks.append(bank)
+            debug_print(f"  Added bank {bank_id} with {len(programs)} programs")
+        
+        return start_offset + 8 + chunk_size + 12
+    
+    def _decode_bank_id(self, bank_id_raw: int, is_combi: bool) -> str:
+        """Decode raw bank ID to human-readable format.
+        
+        Bank ID format (4 bytes):
+        - Byte 0: Bank type/engine (0x00=INT, 0x0C=EXi, etc.)
+        - Byte 1: Sub-bank (0x00=A, 0x01=B, etc.)
+        - Byte 2: Additional info
+        - Byte 3: Flags
+        
+        Examples:
+        - 0x00000000 = I-A (Internal bank A)
+        - 0x0C000200 = I-AA (EXi bank AA)
+        - 0x0C010200 = I-AB (EXi bank AB)
+        """
+        # Extract bytes
+        byte0 = (bank_id_raw >> 24) & 0xFF
+        byte1 = (bank_id_raw >> 16) & 0xFF
+        byte2 = (bank_id_raw >> 8) & 0xFF
+        byte3 = bank_id_raw & 0xFF
+        
+        # Determine prefix (always I- for internal)
+        prefix = "I-"
+        
+        # Determine bank letter(s)
+        if byte0 == 0x00:
+            # Standard internal bank (A-G)
+            bank_letter = chr(65 + byte1)  # A, B, C, etc.
+        elif byte0 == 0x0C:
+            # EXi banks use double letters (AA, AB, AC, etc.)
+            bank_letter = chr(65 + byte1) + chr(65 + byte1)  # AA, BB, CC, etc.
+            if byte2 > 0:
+                # Sub-banks: AA, AB, AC, etc.
+                bank_letter = chr(65 + byte1) + chr(65 + byte2)
+        else:
+            # Other engine types - use simple letter
+            bank_letter = chr(65 + byte1)
+        
+        return f"{prefix}{bank_letter}"
+    
+    def parse_cmb1_chunk(self, pcg: PcgFile):
+        """Parse CMB1 chunk containing combi banks."""
+        # Search for CMB1 anywhere in the file
+        cmb1_offset = self.data.find(b'CMB1')
+        if cmb1_offset < 0:
+            debug_print("CMB1 chunk not found")
+            return
+        
+        offset = cmb1_offset
+        chunk_size = self.get_int(offset + 4, 4)
+        debug_print(f"Found CMB1 at offset {offset:08X}, size {chunk_size:08X}")
+        
+        chunk_end = offset + 8 + chunk_size
+        offset += 12  # Skip chunk header (8) + gap (4)
+        
+        while offset < chunk_end - 8 and offset < len(self.data) - 8:
+            sub_id = self.data[offset:offset+4]
+            debug_print(f"At offset {offset:08X}, found sub-chunk: {sub_id}")
+            
+            if sub_id == b'CBK1':
+                offset = self._parse_cbk1_chunk(pcg, offset)
+            else:
+                # Skip unknown chunk
+                try:
+                    size = self.get_int(offset + 4, 4)
+                    debug_print(f"Skipping unknown chunk {sub_id}, size {size}")
+                    offset += 8 + size + 12
+                except:
+                    break
+    
+    def parse_sls1_chunk(self, pcg: PcgFile):
+        """Parse SLS1 chunk containing set lists."""
+        from .models import SetList, SetListSlot
+        
+        # Search for SLS1 anywhere in the file
+        sls1_offset = self.data.find(b'SLS1')
+        if sls1_offset < 0:
+            debug_print("SLS1 chunk not found")
+            return
+        
+        offset = sls1_offset
+        chunk_size = self.get_int(offset + 4, 4)
+        debug_print(f"Found SLS1 at offset {offset:08X}, size {chunk_size:08X}")
+        
+        pcg.has_set_lists = True
+        
+        # Parse set list data
+        # SLS1 structure (Kronos):
+        # - Header (8 bytes): 'SLS1' + size
+        # - Number of set lists (4 bytes)
+        # - For each set list:
+        #   - Name (24 bytes)
+        #   - Number of slots (4 bytes)
+        #   - For each slot:
+        #     - Name (24 bytes)
+        #     - Patch type (1 byte: 0=Program, 1=Combi)
+        #     - Patch bank (2 bytes)
+        #     - Patch number (2 bytes)
+        #     - Transpose (1 byte, signed)
+        #     - Volume (1 byte)
+        #     - Other parameters...
+        
+        try:
+            data_offset = offset + 8  # Skip header
+            
+            # Try to parse set lists
+            # This is a simplified parser - real format may vary
+            num_setlists = min(self.get_int(data_offset, 4), 16)  # Max 16 set lists
+            data_offset += 4
+            
+            debug_print(f"Number of set lists: {num_setlists}")
+            
+            for sl_idx in range(num_setlists):
+                if data_offset + 32 > len(self.data):
+                    break
+                
+                # Read set list name
+                sl_name = self.get_string(data_offset, 24)
+                if not sl_name:
+                    sl_name = f"Set List {sl_idx}"
+                data_offset += 24
+                
+                # Read number of slots
+                num_slots = min(self.get_int(data_offset, 4), 128)  # Max 128 slots
+                data_offset += 4
+                
+                debug_print(f"Set list {sl_idx}: {sl_name}, {num_slots} slots")
+                
+                setlist = SetList(
+                    index=sl_idx,
+                    name=sl_name,
+                    description="",
+                    color=0
+                )
+                
+                # Parse slots
+                for slot_idx in range(num_slots):
+                    if data_offset + 32 > len(self.data):
+                        break
+                    
+                    # Read slot name
+                    slot_name = self.get_string(data_offset, 24)
+                    if not slot_name:
+                        slot_name = f"Slot {slot_idx}"
+                    data_offset += 24
+                    
+                    # Read patch reference
+                    patch_type_byte = self.data[data_offset] if data_offset < len(self.data) else 0
+                    patch_type = "Program" if patch_type_byte == 0 else "Combi"
+                    data_offset += 1
+                    
+                    # Read bank and number
+                    patch_bank_id = self.get_int(data_offset, 2)
+                    data_offset += 2
+                    patch_num = self.get_int(data_offset, 2)
+                    data_offset += 2
+                    
+                    # Convert bank ID to bank string (simplified)
+                    bank_names = ["I-A", "I-B", "I-C", "I-D", "I-E", "I-F", "I-G"]
+                    patch_bank = bank_names[patch_bank_id % len(bank_names)]
+                    
+                    # Read transpose and volume
+                    transpose = struct.unpack('b', self.data[data_offset:data_offset+1])[0] if data_offset < len(self.data) else 0
+                    data_offset += 1
+                    volume = self.data[data_offset] if data_offset < len(self.data) else 127
+                    data_offset += 1
+                    
+                    # Skip other parameters (hold, etc.)
+                    data_offset += 8  # Skip remaining slot data
+                    
+                    slot = SetListSlot(
+                        set_list_index=sl_idx,
+                        slot_index=slot_idx,
+                        name=slot_name,
+                        notes="",
+                        patch_type=patch_type,
+                        patch_bank=patch_bank,
+                        patch_index=patch_num,
+                        transpose=transpose,
+                        volume=volume
+                    )
+                    
+                    setlist.slots.append(slot)
+                    debug_print(f"  Slot {slot_idx}: {slot_name} -> {patch_bank}{patch_num:03d}")
+                
+                pcg.set_lists.append(setlist)
+                
+        except Exception as e:
+            debug_print(f"Error parsing set lists: {e}")
+            # If parsing fails, at least we know set lists exist
+            pass
+    
+    def _parse_cbk1_chunk(self, pcg: PcgFile, offset: int) -> int:
+        """Parse a CBK1 (Combi Bank) chunk."""
+        chunk_size = self.get_int(offset + 4, 4)
+        start_offset = offset
+        
+        debug_print(f"Parsing CBK1 at {offset:08X}, size {chunk_size:08X}")
+        
+        # CBK1 structure varies - try both +24 and +40 offsets
+        # Some files have combis at +24, others at +40
+        combi_size = 7810  # Kronos combi size
+        combis = []
+        
+        # Try offset +24 first (older format)
+        scan_offset = offset + 24
+        for i in range(128):
+            if scan_offset + 24 > len(self.data):
+                break
+            name = self.get_string(scan_offset, 24)
+            if name and len(name) >= 3 and name.isprintable():
+                combis.append((i, name, scan_offset))
+                if i < 3:
+                    debug_print(f"  Found combi {i} at +24: {name}")
+                scan_offset += combi_size
+            else:
+                break
+        
+        # If no combis found at +24, try +40 (newer format)
+        if not combis:
+            scan_offset = offset + 40
+            for i in range(128):
+                if scan_offset + 24 > len(self.data):
+                    break
+                name = self.get_string(scan_offset, 24)
+                if name and len(name) >= 3 and name.isprintable():
+                    combis.append((i, name, scan_offset))
+                    if i < 3:
+                        debug_print(f"  Found combi {i} at +40: {name}")
+                    scan_offset += combi_size
+                else:
+                    break
+        
+        if combis:
+            # Decode bank ID - try both possible locations
+            # Older format: +20, Newer format: +28
+            bank_id_raw = self.get_int(start_offset + 20, 4)
+            if bank_id_raw == 0 or bank_id_raw > 0x10000000:
+                # Try newer format
+                bank_id_raw = self.get_int(start_offset + 28, 4)
+            
+            bank_id = self._decode_bank_id(bank_id_raw, is_combi=True)
+            debug_print(f"  Decoded bank ID: {bank_id} (raw: {bank_id_raw:08X})")
+            
+            bank = Bank(bank_id=bank_id, bank_type='Combi')
+            
+            for idx, name, combi_offset in combis:
+                combi = Combi(
+                    bank=bank_id,
+                    index=idx,
+                    name=name,
+                    raw_data=self.data[combi_offset:combi_offset+7810]
+                )
+                bank.patches.append(combi)
+                debug_print(f"  Combi {idx}: {name}")
+            
+            pcg.combi_banks.append(bank)
+            debug_print(f"  Added bank {bank_id} with {len(combis)} combis")
+        
+        return start_offset + 8 + chunk_size + 12
+    
+    def _bank_id_to_name(self, bank_id: int, is_combi: bool) -> str:
+        """Convert bank ID to bank name (I-A, I-B, U-A, etc.)."""
+        # Handle invalid bank IDs
+        if bank_id < 0 or bank_id > 0x30000:
+            debug_print(f"Invalid bank ID: {bank_id:08X}, using default")
+            return "I-A"
+        
+        if bank_id < 0x20000:
+            # Internal banks (I-A through I-G)
+            if bank_id < 26:  # A-Z
+                return f"I-{chr(65 + bank_id)}"  # 65 is 'A'
+            else:
+                return f"I-{bank_id}"
+        else:
+            # User banks (U-A through U-GG)
+            user_index = bank_id - 0x20000
+            if user_index < 7:
+                return f"U-{chr(65 + user_index)}"
+            elif user_index < 56:  # 7 + 7*7
+                # Extended banks (U-AA through U-GG)
+                first_letter = chr(65 + ((user_index - 7) // 7))
+                second_letter = chr(65 + ((user_index - 7) % 7))
+                return f"U-{first_letter}{second_letter}"
+            else:
+                return f"U-{user_index}"
