@@ -1650,6 +1650,136 @@ class PcgWindow:
                 messagebox.showerror("Error", f"Failed to drop:\n{e}", parent=self.window)
         
         self.drag_data = None
+    
+    def undo(self):
+        """Undo last action."""
+        if self.undo_manager.undo():
+            self.mark_dirty()
+            self._refresh_current_view()
+            messagebox.showinfo("Undo", f"Undone: {self.undo_manager.get_redo_description()}", parent=self.window)
+    
+    def redo(self):
+        """Redo last undone action."""
+        if self.undo_manager.redo():
+            self.mark_dirty()
+            self._refresh_current_view()
+            messagebox.showinfo("Redo", f"Redone: {self.undo_manager.get_undo_description()}", parent=self.window)
+    
+    def _update_undo_menu(self):
+        """Update undo/redo menu items."""
+        if hasattr(self, 'edit_menu'):
+            # Update Undo
+            if self.undo_manager.can_undo():
+                desc = self.undo_manager.get_undo_description()
+                self.edit_menu.entryconfig(0, label=f"Undo {desc}", state=tk.NORMAL)
+            else:
+                self.edit_menu.entryconfig(0, label="Undo", state=tk.DISABLED)
+            
+            # Update Redo
+            if self.undo_manager.can_redo():
+                desc = self.undo_manager.get_redo_description()
+                self.edit_menu.entryconfig(1, label=f"Redo {desc}", state=tk.NORMAL)
+            else:
+                self.edit_menu.entryconfig(1, label="Redo", state=tk.DISABLED)
+    
+    def revert_to_saved(self):
+        """Revert file to last saved version."""
+        if not self.filepath:
+            messagebox.showwarning("No File", "No file to revert to", parent=self.window)
+            return
+        
+        if not self.is_dirty:
+            messagebox.showinfo("No Changes", "File has no unsaved changes", parent=self.window)
+            return
+        
+        if messagebox.askyesno("Revert", "Discard all changes and reload from disk?", parent=self.window):
+            try:
+                self.pcg = read_pcg_file(self.filepath)
+                self.operations = PatchOperations(self.pcg)
+                self.is_dirty = False
+                self.undo_manager.clear()
+                self._refresh_current_view()
+                self._update_title()
+                messagebox.showinfo("Reverted", "File reverted to saved version", parent=self.window)
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to revert file: {e}", parent=self.window)
+    
+    def _refresh_current_view(self):
+        """Refresh the currently displayed view."""
+        view = self.view_var.get()
+        if view == "programs":
+            self._update_programs_tree()
+        elif view == "combis":
+            self._update_combis_tree()
+        elif view == "setlists":
+            self._update_setlists_tree()
+        elif view == "all":
+            self._update_all_patches_tree()
+    
+    def select_all(self):
+        """Select all patches in current view."""
+        tree = self._get_current_tree()
+        if tree:
+            for item in tree.get_children():
+                tree.selection_add(item)
+    
+    def invert_selection(self):
+        """Invert selection in current view."""
+        tree = self._get_current_tree()
+        if tree:
+            selected = set(tree.selection())
+            all_items = set(tree.get_children())
+            new_selection = all_items - selected
+            tree.selection_set(list(new_selection))
+    
+    def show_find(self):
+        """Show find dialog."""
+        messagebox.showinfo("Find", "Find feature coming soon", parent=self.window)
+    
+    def find_next(self):
+        """Find next match."""
+        pass
+    
+    def clear_duplicates(self):
+        """Clear duplicate patches."""
+        messagebox.showinfo("Clear Duplicates", "Feature coming soon", parent=self.window)
+    
+    def swap_patches(self):
+        """Swap two selected patches."""
+        messagebox.showinfo("Swap Patches", "Feature coming soon", parent=self.window)
+    
+    def insert_empty(self):
+        """Insert empty patch."""
+        messagebox.showinfo("Insert Empty", "Feature coming soon", parent=self.window)
+    
+    def change_case(self, case_type):
+        """Change case of patch names."""
+        messagebox.showinfo("Change Case", f"Change to {case_type} coming soon", parent=self.window)
+    
+    def change_volume(self):
+        """Change volume of selected patches."""
+        messagebox.showinfo("Change Volume", "Feature coming soon", parent=self.window)
+    
+    def export_list(self):
+        """Export patch list."""
+        messagebox.showinfo("Export", "Use CLI: pcg-tools export", parent=self.window)
+    
+    def generate_reports(self):
+        """Generate reports."""
+        messagebox.showinfo("Reports", "Use CLI: pcg-tools program-usage / combi-content", parent=self.window)
+    
+    def _get_current_tree(self):
+        """Get the currently visible tree widget."""
+        view = self.view_var.get()
+        if view == "programs":
+            return self.programs_tree
+        elif view == "combis":
+            return self.combis_tree
+        elif view == "setlists":
+            return self.setlists_tree
+        elif view == "all":
+            return self.all_tree
+        return None
 
 
 class PcgToolsGUI:
@@ -2035,138 +2165,6 @@ Tips:
             "by Michel Keijzers\n\n"
             "Free for non-commercial use"
         )
-
-
-    def undo(self):
-        """Undo last action."""
-        if self.undo_manager.undo():
-            self.mark_dirty()
-            self._refresh_current_view()
-            messagebox.showinfo("Undo", f"Undone: {self.undo_manager.get_redo_description()}", parent=self.window)
-    
-    def redo(self):
-        """Redo last undone action."""
-        if self.undo_manager.redo():
-            self.mark_dirty()
-            self._refresh_current_view()
-            messagebox.showinfo("Redo", f"Redone: {self.undo_manager.get_undo_description()}", parent=self.window)
-    
-    def _update_undo_menu(self):
-        """Update undo/redo menu items."""
-        if hasattr(self, 'edit_menu'):
-            # Update Undo
-            if self.undo_manager.can_undo():
-                desc = self.undo_manager.get_undo_description()
-                self.edit_menu.entryconfig(0, label=f"Undo {desc}", state=tk.NORMAL)
-            else:
-                self.edit_menu.entryconfig(0, label="Undo", state=tk.DISABLED)
-            
-            # Update Redo
-            if self.undo_manager.can_redo():
-                desc = self.undo_manager.get_redo_description()
-                self.edit_menu.entryconfig(1, label=f"Redo {desc}", state=tk.NORMAL)
-            else:
-                self.edit_menu.entryconfig(1, label="Redo", state=tk.DISABLED)
-    
-    def revert_to_saved(self):
-        """Revert file to last saved version."""
-        if not self.filepath:
-            messagebox.showwarning("No File", "No file to revert to", parent=self.window)
-            return
-        
-        if not self.is_dirty:
-            messagebox.showinfo("No Changes", "File has no unsaved changes", parent=self.window)
-            return
-        
-        if messagebox.askyesno("Revert", "Discard all changes and reload from disk?", parent=self.window):
-            try:
-                self.pcg = read_pcg_file(self.filepath)
-                self.operations = PatchOperations(self.pcg)
-                self.is_dirty = False
-                self.undo_manager.clear()
-                self._refresh_current_view()
-                self._update_title()
-                messagebox.showinfo("Reverted", "File reverted to saved version", parent=self.window)
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to revert file: {e}", parent=self.window)
-    
-    def _refresh_current_view(self):
-        """Refresh the currently displayed view."""
-        view = self.view_var.get()
-        if view == "programs":
-            self._update_programs_tree()
-        elif view == "combis":
-            self._update_combis_tree()
-        elif view == "setlists":
-            self._update_setlists_tree()
-        elif view == "all":
-            self._update_all_patches_tree()
-    
-    # Placeholder methods for menu items (implement as needed)
-    def select_all(self):
-        """Select all patches in current view."""
-        tree = self._get_current_tree()
-        if tree:
-            for item in tree.get_children():
-                tree.selection_add(item)
-    
-    def invert_selection(self):
-        """Invert selection in current view."""
-        tree = self._get_current_tree()
-        if tree:
-            selected = set(tree.selection())
-            all_items = set(tree.get_children())
-            new_selection = all_items - selected
-            tree.selection_set(list(new_selection))
-    
-    def show_find(self):
-        """Show find dialog."""
-        messagebox.showinfo("Find", "Find feature coming soon", parent=self.window)
-    
-    def find_next(self):
-        """Find next match."""
-        pass
-    
-    def clear_duplicates(self):
-        """Clear duplicate patches."""
-        messagebox.showinfo("Clear Duplicates", "Feature coming soon", parent=self.window)
-    
-    def swap_patches(self):
-        """Swap two selected patches."""
-        messagebox.showinfo("Swap Patches", "Feature coming soon", parent=self.window)
-    
-    def insert_empty(self):
-        """Insert empty patch."""
-        messagebox.showinfo("Insert Empty", "Feature coming soon", parent=self.window)
-    
-    def change_case(self, case_type):
-        """Change case of patch names."""
-        messagebox.showinfo("Change Case", f"Change to {case_type} coming soon", parent=self.window)
-    
-    def change_volume(self):
-        """Change volume of selected patches."""
-        messagebox.showinfo("Change Volume", "Feature coming soon", parent=self.window)
-    
-    def export_list(self):
-        """Export patch list."""
-        messagebox.showinfo("Export", "Use CLI: pcg-tools export", parent=self.window)
-    
-    def generate_reports(self):
-        """Generate reports."""
-        messagebox.showinfo("Reports", "Use CLI: pcg-tools program-usage / combi-content", parent=self.window)
-    
-    def _get_current_tree(self):
-        """Get the currently visible tree widget."""
-        view = self.view_var.get()
-        if view == "programs":
-            return self.programs_tree
-        elif view == "combis":
-            return self.combis_tree
-        elif view == "setlists":
-            return self.setlists_tree
-        elif view == "all":
-            return self.all_tree
-        return None
 
 
 def launch_gui():
