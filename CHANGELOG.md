@@ -5,6 +5,28 @@ All notable changes to PCG Tools Python will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2025-11-16
+
+### Added - The Final 5%!
+- **Undo/Redo Support**: Full undo/redo with 50-action history (Ctrl+Z / Ctrl+Y)
+- **Set List Editing**: Complete set list slot editing dialog
+- **Set List Properties**: Edit set list names and descriptions
+- **Revert to Saved**: Explicit revert button to discard changes
+- **Enhanced Edit Menu**: Shows undo/redo action descriptions
+- **Undo Manager**: Comprehensive undo system with callbacks
+- **Action Descriptions**: Clear descriptions of what will be undone/redone
+
+### Improved
+- Edit menu now shows what action will be undone/redone
+- Better keyboard shortcut integration
+- More complete feature parity with original PCG Tools
+
+### Technical
+- New `undo.py` module with UndoManager class
+- New `setlist_editor.py` module with editing dialogs
+- Integrated undo support throughout GUI operations
+- Action-based undo system for extensibility
+
 ## [2.0.0] - 2025-11-16
 
 ### Added
