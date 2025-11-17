@@ -8,16 +8,16 @@ with open("README.md", "r", encoding="utf-8") as fh:
 setup(
     name="pcg-tools",
     version="2.1.0",
-    author="PCG Tools Python Contributors",
-    author_email="",
+    author="Brian Slater",
+    author_email="brian.m.slater@gmail.com",
     description="Cross-platform Korg PCG file editor - Python rewrite of PCG Tools",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/pcg-tools-python",
+    url="https://github.com/bslater/pcg-tools-python",
     project_urls={
-        "Bug Reports": "https://github.com/yourusername/pcg-tools-python/issues",
-        "Source": "https://github.com/yourusername/pcg-tools-python",
-        "Documentation": "https://github.com/yourusername/pcg-tools-python#readme",
+        "Bug Reports": "https://github.com/bslater/pcg-tools-python/issues",
+        "Source": "https://github.com/bslater/pcg-tools-python",
+        "Documentation": "https://github.com/bslater/pcg-tools-python#readme",
     },
     packages=find_packages(),
     classifiers=[
