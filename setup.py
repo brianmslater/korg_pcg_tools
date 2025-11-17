@@ -13,11 +13,11 @@ setup(
     description="Cross-platform Korg PCG file editor - Python rewrite of PCG Tools",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/bslater/pcg-tools-python",
+    url="https://github.com/brianmslater/pcg-tools-python",
     project_urls={
-        "Bug Reports": "https://github.com/bslater/pcg-tools-python/issues",
-        "Source": "https://github.com/bslater/pcg-tools-python",
-        "Documentation": "https://github.com/bslater/pcg-tools-python#readme",
+        "Bug Reports": "https://github.com/brianmslater/pcg-tools-python/issues",
+        "Source": "https://github.com/brianmslater/pcg-tools-python",
+        "Documentation": "https://github.com/brianmslater/pcg-tools-python#readme",
     },
     packages=find_packages(),
     classifiers=[
