@@ -9,6 +9,8 @@ from .clipboard import get_clipboard
 from .operations import PatchOperations
 from .edit_dialog import EditPatchDialog
 from .settings import get_settings
+from .undo import UndoManager
+from .setlist_editor import SetListSlotEditor, SetListEditor
 
 
 class PcgWindow:
@@ -25,6 +27,8 @@ class PcgWindow:
         self.is_dirty = False
         self.clipboard = get_clipboard()
         self.operations = None
+        self.undo_manager = UndoManager()
+        self.undo_manager.add_callback(self._update_undo_menu)
         
         self._create_widgets()
         
@@ -103,24 +107,27 @@ class PcgWindow:
         file_menu.add_command(label="Close", command=self.close, accelerator="Ctrl+W")
         
         # Edit menu
-        edit_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Edit", menu=edit_menu)
-        edit_menu.add_command(label="Select All", command=self.select_all, accelerator="Ctrl+A")
-        edit_menu.add_command(label="Invert Selection", command=self.invert_selection)
-        edit_menu.add_separator()
-        edit_menu.add_command(label="Find...", command=self.show_find, accelerator="Ctrl+F")
-        edit_menu.add_command(label="Find Next", command=self.find_next, accelerator="F3")
-        edit_menu.add_separator()
-        edit_menu.add_command(label="Clear Duplicates", command=self.clear_duplicates)
-        edit_menu.add_command(label="Swap Patches", command=self.swap_patches)
-        edit_menu.add_command(label="Insert Empty", command=self.insert_empty)
-        edit_menu.add_separator()
-        edit_menu.add_command(label="Capitalize Names", command=lambda: self.change_case('capitalize'))
-        edit_menu.add_command(label="Uppercase Names", command=lambda: self.change_case('upper'))
-        edit_menu.add_command(label="Lowercase Names", command=lambda: self.change_case('lower'))
-        edit_menu.add_command(label="Title Case Names", command=lambda: self.change_case('title'))
-        edit_menu.add_separator()
-        edit_menu.add_command(label="Change Volume...", command=self.change_volume)
+        self.edit_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Edit", menu=self.edit_menu)
+        self.edit_menu.add_command(label="Undo", command=self.undo, accelerator="Ctrl+Z", state=tk.DISABLED)
+        self.edit_menu.add_command(label="Redo", command=self.redo, accelerator="Ctrl+Y", state=tk.DISABLED)
+        self.edit_menu.add_separator()
+        self.edit_menu.add_command(label="Select All", command=self.select_all, accelerator="Ctrl+A")
+        self.edit_menu.add_command(label="Invert Selection", command=self.invert_selection)
+        self.edit_menu.add_separator()
+        self.edit_menu.add_command(label="Find...", command=self.show_find, accelerator="Ctrl+F")
+        self.edit_menu.add_command(label="Find Next", command=self.find_next, accelerator="F3")
+        self.edit_menu.add_separator()
+        self.edit_menu.add_command(label="Clear Duplicates", command=self.clear_duplicates)
+        self.edit_menu.add_command(label="Swap Patches", command=self.swap_patches)
+        self.edit_menu.add_command(label="Insert Empty", command=self.insert_empty)
+        self.edit_menu.add_separator()
+        self.edit_menu.add_command(label="Capitalize Names", command=lambda: self.change_case('capitalize'))
+        self.edit_menu.add_command(label="Uppercase Names", command=lambda: self.change_case('upper'))
+        self.edit_menu.add_command(label="Lowercase Names", command=lambda: self.change_case('lower'))
+        self.edit_menu.add_command(label="Title Case Names", command=lambda: self.change_case('title'))
+        self.edit_menu.add_separator()
+        self.edit_menu.add_command(label="Change Volume...", command=self.change_volume)
         
         # Tools menu
         tools_menu = tk.Menu(menubar, tearoff=0)
@@ -134,6 +141,8 @@ class PcgWindow:
         self.window.bind('<Control-f>', lambda e: self.show_find())
         self.window.bind('<F3>', lambda e: self.find_next())
         self.window.bind('<Control-a>', lambda e: self.select_all())
+        self.window.bind('<Control-z>', lambda e: self.undo())
+        self.window.bind('<Control-y>', lambda e: self.redo())
         
         # Store last search
         self.last_search = ""
@@ -2024,6 +2033,138 @@ Tips:
             "by Michel Keijzers\n\n"
             "Free for non-commercial use"
         )
+
+
+    def undo(self):
+        """Undo last action."""
+        if self.undo_manager.undo():
+            self.mark_dirty()
+            self._refresh_current_view()
+            messagebox.showinfo("Undo", f"Undone: {self.undo_manager.get_redo_description()}", parent=self.window)
+    
+    def redo(self):
+        """Redo last undone action."""
+        if self.undo_manager.redo():
+            self.mark_dirty()
+            self._refresh_current_view()
+            messagebox.showinfo("Redo", f"Redone: {self.undo_manager.get_undo_description()}", parent=self.window)
+    
+    def _update_undo_menu(self):
+        """Update undo/redo menu items."""
+        if hasattr(self, 'edit_menu'):
+            # Update Undo
+            if self.undo_manager.can_undo():
+                desc = self.undo_manager.get_undo_description()
+                self.edit_menu.entryconfig(0, label=f"Undo {desc}", state=tk.NORMAL)
+            else:
+                self.edit_menu.entryconfig(0, label="Undo", state=tk.DISABLED)
+            
+            # Update Redo
+            if self.undo_manager.can_redo():
+                desc = self.undo_manager.get_redo_description()
+                self.edit_menu.entryconfig(1, label=f"Redo {desc}", state=tk.NORMAL)
+            else:
+                self.edit_menu.entryconfig(1, label="Redo", state=tk.DISABLED)
+    
+    def revert_to_saved(self):
+        """Revert file to last saved version."""
+        if not self.filepath:
+            messagebox.showwarning("No File", "No file to revert to", parent=self.window)
+            return
+        
+        if not self.is_dirty:
+            messagebox.showinfo("No Changes", "File has no unsaved changes", parent=self.window)
+            return
+        
+        if messagebox.askyesno("Revert", "Discard all changes and reload from disk?", parent=self.window):
+            try:
+                self.pcg = read_pcg_file(self.filepath)
+                self.operations = PatchOperations(self.pcg)
+                self.is_dirty = False
+                self.undo_manager.clear()
+                self._refresh_current_view()
+                self._update_title()
+                messagebox.showinfo("Reverted", "File reverted to saved version", parent=self.window)
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to revert file: {e}", parent=self.window)
+    
+    def _refresh_current_view(self):
+        """Refresh the currently displayed view."""
+        view = self.view_var.get()
+        if view == "programs":
+            self._update_programs_tree()
+        elif view == "combis":
+            self._update_combis_tree()
+        elif view == "setlists":
+            self._update_setlists_tree()
+        elif view == "all":
+            self._update_all_patches_tree()
+    
+    # Placeholder methods for menu items (implement as needed)
+    def select_all(self):
+        """Select all patches in current view."""
+        tree = self._get_current_tree()
+        if tree:
+            for item in tree.get_children():
+                tree.selection_add(item)
+    
+    def invert_selection(self):
+        """Invert selection in current view."""
+        tree = self._get_current_tree()
+        if tree:
+            selected = set(tree.selection())
+            all_items = set(tree.get_children())
+            new_selection = all_items - selected
+            tree.selection_set(list(new_selection))
+    
+    def show_find(self):
+        """Show find dialog."""
+        messagebox.showinfo("Find", "Find feature coming soon", parent=self.window)
+    
+    def find_next(self):
+        """Find next match."""
+        pass
+    
+    def clear_duplicates(self):
+        """Clear duplicate patches."""
+        messagebox.showinfo("Clear Duplicates", "Feature coming soon", parent=self.window)
+    
+    def swap_patches(self):
+        """Swap two selected patches."""
+        messagebox.showinfo("Swap Patches", "Feature coming soon", parent=self.window)
+    
+    def insert_empty(self):
+        """Insert empty patch."""
+        messagebox.showinfo("Insert Empty", "Feature coming soon", parent=self.window)
+    
+    def change_case(self, case_type):
+        """Change case of patch names."""
+        messagebox.showinfo("Change Case", f"Change to {case_type} coming soon", parent=self.window)
+    
+    def change_volume(self):
+        """Change volume of selected patches."""
+        messagebox.showinfo("Change Volume", "Feature coming soon", parent=self.window)
+    
+    def export_list(self):
+        """Export patch list."""
+        messagebox.showinfo("Export", "Use CLI: pcg-tools export", parent=self.window)
+    
+    def generate_reports(self):
+        """Generate reports."""
+        messagebox.showinfo("Reports", "Use CLI: pcg-tools program-usage / combi-content", parent=self.window)
+    
+    def _get_current_tree(self):
+        """Get the currently visible tree widget."""
+        view = self.view_var.get()
+        if view == "programs":
+            return self.programs_tree
+        elif view == "combis":
+            return self.combis_tree
+        elif view == "setlists":
+            return self.setlists_tree
+        elif view == "all":
+            return self.all_tree
+        return None
 
 
 def launch_gui():
