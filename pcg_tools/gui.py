@@ -28,9 +28,11 @@ class PcgWindow:
         self.clipboard = get_clipboard()
         self.operations = None
         self.undo_manager = UndoManager()
-        self.undo_manager.add_callback(self._update_undo_menu)
         
         self._create_widgets()
+        
+        # Add undo callback after widgets are created
+        self.undo_manager.add_callback(self._update_undo_menu)
         
         if filepath:
             self.load_file(filepath)
