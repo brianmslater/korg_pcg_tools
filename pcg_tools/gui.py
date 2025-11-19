@@ -11,6 +11,7 @@ from .edit_dialog import EditPatchDialog
 from .settings import get_settings
 from .undo import UndoManager
 from .setlist_editor import SetListSlotEditor, SetListEditor
+from .window_settings import get_window_settings
 
 
 class PcgWindow:
@@ -20,7 +21,16 @@ class PcgWindow:
         self.parent = parent
         self.window = tk.Toplevel(parent.root)
         self.window.title("PCG File")
-        self.window.geometry("800x500")
+        
+        # Restore window position and size
+        self.window_settings = get_window_settings()
+        width, height = self.window_settings.get_size('pcg_window')
+        x, y = self.window_settings.get_position('pcg_window')
+        
+        if x is not None and y is not None:
+            self.window.geometry(f"{width}x{height}+{x}+{y}")
+        else:
+            self.window.geometry("800x500")
         
         self.pcg = None
         self.filepath = filepath
@@ -33,6 +43,9 @@ class PcgWindow:
         
         # Add undo callback after widgets are created
         self.undo_manager.add_callback(self._update_undo_menu)
+        
+        # Save window position on close
+        self.window.protocol("WM_DELETE_WINDOW", self._on_close)
         
         if filepath:
             self.load_file(filepath)
@@ -1734,10 +1747,46 @@ class PcgWindow:
     
     def show_find(self):
         """Show find dialog."""
-        messagebox.showinfo("Find", "Find feature coming soon", parent=self.window)
+        dialog = tk.Toplevel(self.window)
+        dialog.title("Find Patch")
+        dialog.geometry("400x150")
+        dialog.transient(self.window)
+        
+        ttk.Label(dialog, text="Find patch by name:").pack(pady=10)
+        
+        search_var = tk.StringVar()
+        entry = ttk.Entry(dialog, textvariable=search_var, width=40)
+        entry.pack(pady=5)
+        entry.focus()
+        
+        def do_find():
+            query = search_var.get().lower()
+            if not query:
+                return
+            
+            tree = self._get_current_tree()
+            if not tree:
+                return
+            
+            # Search through all items
+            for item in tree.get_children():
+                values = tree.item(item)['values']
+                if values and len(values) > 1:
+                    name = str(values[1]).lower()
+                    if query in name:
+                        tree.selection_set(item)
+                        tree.see(item)
+                        dialog.destroy()
+                        return
+            
+            messagebox.showinfo("Not Found", f"No patch found matching '{query}'", parent=dialog)
+        
+        ttk.Button(dialog, text="Find", command=do_find).pack(pady=10)
+        entry.bind('<Return>', lambda e: do_find())
     
     def find_next(self):
         """Find next match."""
+        # Placeholder for find next functionality
         pass
     
     def clear_duplicates(self):
@@ -1754,7 +1803,42 @@ class PcgWindow:
     
     def change_case(self, case_type):
         """Change case of patch names."""
-        messagebox.showinfo("Change Case", f"Change to {case_type} coming soon", parent=self.window)
+        tree = self._get_current_tree()
+        if not tree or not tree.selection():
+            messagebox.showwarning("No Selection", "Please select patches first", parent=self.window)
+            return
+        
+        count = 0
+        for item in tree.selection():
+            values = tree.item(item)['values']
+            if not values:
+                continue
+            
+            patch_id = values[0]
+            bank = patch_id[:-3]
+            index = int(patch_id[-3:])
+            
+            view = self.view_var.get()
+            if view == "programs":
+                patch = self.pcg.find_program(bank, index)
+            else:
+                patch = self.pcg.find_combi(bank, index)
+            
+            if patch and patch.name:
+                if case_type == 'upper':
+                    patch.name = patch.name.upper()
+                elif case_type == 'lower':
+                    patch.name = patch.name.lower()
+                elif case_type == 'title':
+                    patch.name = patch.name.title()
+                elif case_type == 'capitalize':
+                    patch.name = patch.name.capitalize()
+                count += 1
+        
+        if count > 0:
+            self.mark_dirty()
+            self._refresh_current_view()
+            messagebox.showinfo("Success", f"Changed case of {count} patch(es)", parent=self.window)
     
     def change_volume(self):
         """Change volume of selected patches."""
@@ -1780,6 +1864,36 @@ class PcgWindow:
         elif view == "all":
             return self.all_tree
         return None
+    
+    def _on_close(self):
+        """Handle window close event."""
+        # Save window position and size
+        try:
+            self.window.update_idletasks()
+            x = self.window.winfo_x()
+            y = self.window.winfo_y()
+            width = self.window.winfo_width()
+            height = self.window.winfo_height()
+            self.window_settings.save_position_and_size('pcg_window', x, y, width, height)
+        except:
+            pass
+        
+        # Check for unsaved changes
+        if self.is_dirty:
+            response = messagebox.askyesnocancel(
+                "Unsaved Changes",
+                "Do you want to save changes before closing?",
+                parent=self.window
+            )
+            if response is None:  # Cancel
+                return
+            elif response:  # Yes
+                self.save_file()
+        
+        # Close window
+        self.window.destroy()
+        if self in self.parent.windows:
+            self.parent.windows.remove(self)
 
 
 class PcgToolsGUI:
