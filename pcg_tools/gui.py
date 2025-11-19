@@ -1852,19 +1852,6 @@ class PcgWindow:
         """Generate reports."""
         messagebox.showinfo("Reports", "Use CLI: pcg-tools program-usage / combi-content", parent=self.window)
     
-    def _get_current_tree(self):
-        """Get the currently visible tree widget."""
-        view = self.view_var.get()
-        if view == "programs":
-            return self.programs_tree
-        elif view == "combis":
-            return self.combis_tree
-        elif view == "setlists":
-            return self.setlists_tree
-        elif view == "all":
-            return self.all_tree
-        return None
-    
     def _on_close(self):
         """Handle window close event."""
         # Save window position and size
