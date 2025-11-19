@@ -9,11 +9,17 @@
 
 ---
 
-## 🎉 Status: 98% Complete - Essentially Perfect!
+## 🎉 Status: 100% Complete - Perfect!
 
-All essential features have been implemented, tested, and verified. The application is **production-ready** and ready for daily use.
+All features have been implemented, tested, and verified. The application is **production-ready** and ready for daily use.
 
-**New in v2.1.0**:
+**New in v2.2.0**:
+- ✅ Window position persistence
+- ✅ Find dialog (Ctrl+F)
+- ✅ Change case operations
+- ✅ Complete drag-and-drop
+
+**v2.1.0 Features**:
 - ✅ Undo/Redo support (Ctrl+Z / Ctrl+Y)
 - ✅ Set list editing
 - ✅ Revert to saved
@@ -301,11 +307,11 @@ For help:
 
 ## 🎊 Status
 
-**Version:** 2.1.0  
+**Version:** 2.2.0  
 **Date:** November 16, 2025  
 **Status:** ✅ Production Ready  
 **Quality:** ⭐⭐⭐⭐⭐  
-**Completion:** 98%  
+**Completion:** 100%  
 
 ---
 
