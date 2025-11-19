@@ -474,19 +474,102 @@ class PcgBinaryParser:
             bank = Bank(bank_id=bank_id, bank_type='Combi')
             
             for idx, name, combi_offset in combis:
+                # Parse timbres from combi data
+                timbres = self._parse_timbres(combi_offset)
+                
                 combi = Combi(
                     bank=bank_id,
                     index=idx,
                     name=name,
+                    timbres=timbres,
                     raw_data=self.data[combi_offset:combi_offset+7810]
                 )
                 bank.patches.append(combi)
-                debug_print(f"  Combi {idx}: {name}")
+                debug_print(f"  Combi {idx}: {name} with {len(timbres)} timbres")
             
             pcg.combi_banks.append(bank)
             debug_print(f"  Added bank {bank_id} with {len(combis)} combis")
         
         return start_offset + 8 + chunk_size + 12
+    
+    def _parse_timbres(self, combi_offset: int) -> List:
+        """Parse timbres from combi data.
+        
+        Kronos combi structure (simplified):
+        - Offset 0-23: Name
+        - Offset 24-25: Category
+        - Offset ~1024+: Timbre data (16 timbres, each ~400 bytes)
+        
+        Each timbre contains:
+        - Status (INT/OFF/EXi)
+        - Program bank/number reference
+        - MIDI channel, volume, pan, etc.
+        """
+        from .models import Timbre
+        
+        timbres = []
+        
+        # Timbre data starts around offset 1024 in Kronos combis
+        # Each timbre is approximately 400 bytes
+        timbre_base = combi_offset + 1024
+        timbre_size = 400
+        
+        for i in range(16):  # 16 timbres per combi
+            timbre_offset = timbre_base + (i * timbre_size)
+            
+            if timbre_offset + 20 > len(self.data):
+                break
+            
+            try:
+                # Parse timbre status (offset +0)
+                # 0 = OFF, 1 = INT, 2 = EXi, etc.
+                status_byte = self.data[timbre_offset]
+                status = "OFF"
+                if status_byte == 1:
+                    status = "INT"
+                elif status_byte == 2:
+                    status = "EXi"
+                
+                # Parse program reference (offset +4 and +5)
+                # Bank ID is at +4 (1 byte), Program number at +5 (1 byte)
+                prog_bank_byte = self.data[timbre_offset + 4] if timbre_offset + 4 < len(self.data) else 0
+                prog_num_byte = self.data[timbre_offset + 5] if timbre_offset + 5 < len(self.data) else 0
+                
+                # Convert bank byte to bank ID
+                prog_bank = "I-A"
+                if prog_bank_byte < 7:  # I-A through I-G
+                    prog_bank = f"I-{chr(65 + prog_bank_byte)}"
+                elif prog_bank_byte >= 0x20:  # User banks
+                    user_idx = prog_bank_byte - 0x20
+                    if user_idx < 7:
+                        prog_bank = f"U-{chr(65 + user_idx)}"
+                
+                # MIDI channel (offset +2)
+                midi_channel = self.data[timbre_offset + 2] if timbre_offset + 2 < len(self.data) else 0
+                
+                # Volume (offset +8)
+                volume = self.data[timbre_offset + 8] if timbre_offset + 8 < len(self.data) else 127
+                
+                # Pan (offset +9)
+                pan = self.data[timbre_offset + 9] if timbre_offset + 9 < len(self.data) else 64
+                
+                timbre = Timbre(
+                    program_bank=prog_bank,
+                    program_index=prog_num_byte,
+                    midi_channel=midi_channel,
+                    status=status,
+                    volume=volume,
+                    pan=pan,
+                    mute=False
+                )
+                
+                timbres.append(timbre)
+                
+            except Exception as e:
+                debug_print(f"Error parsing timbre {i}: {e}")
+                continue
+        
+        return timbres
     
     def _bank_id_to_name(self, bank_id: int, is_combi: bool) -> str:
         """Convert bank ID to bank name (I-A, I-B, U-A, etc.)."""

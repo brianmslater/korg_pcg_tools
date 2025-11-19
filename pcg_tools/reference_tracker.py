@@ -29,7 +29,8 @@ class ReferenceTracker:
                 
                 # Check each timbre
                 for timbre in combi.timbres:
-                    if timbre.status == 0:  # Off
+                    # Only count timbres that are ON (status != "OFF")
+                    if timbre.status == "OFF":
                         continue
                     
                     prog_id = timbre.program_id

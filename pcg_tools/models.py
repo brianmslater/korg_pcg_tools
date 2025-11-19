@@ -157,6 +157,7 @@ class PcgFile:
     has_set_lists: bool = False
     raw_data: bytes = b''
     is_dirty: bool = False
+    _reference_tracker: Optional[object] = field(default=None, init=False, repr=False)
     
     def get_all_programs(self) -> List[Program]:
         """Get all programs from all banks."""
@@ -187,3 +188,27 @@ class PcgFile:
                 if 0 <= index < len(combi_bank.patches):
                     return combi_bank.patches[index]
         return None
+    
+    def get_reference_tracker(self):
+        """Get the reference tracker, creating it if needed."""
+        if self._reference_tracker is None:
+            from .reference_tracker import ReferenceTracker
+            self._reference_tracker = ReferenceTracker(self)
+        return self._reference_tracker
+    
+    def refresh_references(self):
+        """Refresh the reference tracker."""
+        if self._reference_tracker is not None:
+            self._reference_tracker.refresh()
+    
+    def get_program_usage(self, program_id: str) -> List[str]:
+        """Get list of combi IDs that use this program."""
+        return self.get_reference_tracker().get_program_usage(program_id)
+    
+    def get_combi_programs(self, combi_id: str) -> set:
+        """Get set of program IDs used by this combi."""
+        return self.get_reference_tracker().get_combi_programs(combi_id)
+    
+    def is_program_used(self, program_id: str) -> bool:
+        """Check if a program is used by any combi."""
+        return self.get_reference_tracker().is_program_used(program_id)
