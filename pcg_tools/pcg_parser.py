@@ -251,21 +251,23 @@ class PcgBinaryParser:
         # Determine prefix (always I- for internal)
         prefix = "I-"
         
-        # Determine bank letter(s)
+        # Determine bank letter(s) - ALWAYS UPPERCASE
         if byte0 == 0x00:
             # Standard internal bank (A-G)
-            bank_letter = chr(65 + byte1)  # A, B, C, etc.
+            bank_letter = chr(65 + byte1).upper()  # A, B, C, etc.
         elif byte0 == 0x0C:
             # EXi banks use double letters (AA, AB, AC, etc.)
-            bank_letter = chr(65 + byte1) + chr(65 + byte1)  # AA, BB, CC, etc.
+            bank_letter = (chr(65 + byte1) + chr(65 + byte1)).upper()  # AA, BB, CC, etc.
             if byte2 > 0:
                 # Sub-banks: AA, AB, AC, etc.
-                bank_letter = chr(65 + byte1) + chr(65 + byte2)
+                bank_letter = (chr(65 + byte1) + chr(65 + byte2)).upper()
         else:
             # Other engine types - use simple letter
-            bank_letter = chr(65 + byte1)
+            bank_letter = chr(65 + byte1).upper()
         
-        return f"{prefix}{bank_letter}"
+        result = f"{prefix}{bank_letter}"
+        debug_print(f"  _decode_bank_id: raw={bank_id_raw:08X}, is_combi={is_combi}, result='{result}'")
+        return result
     
     def parse_cmb1_chunk(self, pcg: PcgFile):
         """Parse CMB1 chunk containing combi banks."""

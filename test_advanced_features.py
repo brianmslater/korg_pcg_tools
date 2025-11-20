@@ -54,7 +54,12 @@ def test_single_file(test_file):
             print(f"\n  Top 5 most used programs:")
             for prog_id, name, usage in usage_examples[:5]:
                 name_display = name[:20] if name else "(empty)"
-                print(f"  {prog_id} - {name_display:20} used by {usage} combi(s)")
+                # Handle Unicode encoding issues
+                try:
+                    print(f"  {prog_id} - {name_display:20} used by {usage} combi(s)")
+                except UnicodeEncodeError:
+                    name_safe = name_display.encode('ascii', errors='replace').decode('ascii')
+                    print(f"  {prog_id} - {name_safe:20} used by {usage} combi(s)")
         else:
             print(f"\n  No programs found with usage data")
         
