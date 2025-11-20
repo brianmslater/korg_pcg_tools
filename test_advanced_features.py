@@ -46,7 +46,10 @@ def test_single_file(test_file):
                     usage_examples.append((program.id, program.name, usage))
                 # Debug first program
                 if i == 0:
-                    print(f"  Debug: First program ID: {program.id}, usage: {usage}")
+                    try:
+                        print(f"  Debug: First program ID: {program.id}, usage: {usage}")
+                    except UnicodeEncodeError:
+                        print(f"  Debug: First program ID: {program.id}, usage: {usage} (name has special chars)")
         
         # Show top 5 most used programs
         usage_examples.sort(key=lambda x: x[2], reverse=True)
