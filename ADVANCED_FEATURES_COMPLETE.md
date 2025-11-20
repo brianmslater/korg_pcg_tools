@@ -110,11 +110,11 @@ All tests passing on multiple real-world PCG files:
 
 ## Known Issues
 
-### Case Sensitivity in Bank IDs
-- Some files have inconsistent bank ID casing (e.g., "I-a000" vs "I-A000")
-- Reference tracker uses exact string matching
-- **Impact**: May not detect all program usage in some files
-- **Workaround**: Normalize bank IDs during parsing (future enhancement)
+### ~~Case Sensitivity in Bank IDs~~ FIXED
+- ~~Some files have inconsistent bank ID casing (e.g., "I-a000" vs "I-A000")~~
+- ~~Reference tracker uses exact string matching~~
+- **FIXED**: All bank IDs are now normalized to uppercase during parsing
+- Reference tracking now works correctly across all tested files
 
 ### Timbre Parsing Accuracy
 - Current implementation uses estimated offsets for Kronos format
@@ -123,7 +123,7 @@ All tests passing on multiple real-world PCG files:
 
 ## Future Enhancements
 
-1. **Bank ID Normalization**: Ensure consistent casing across all operations
+1. ~~**Bank ID Normalization**: Ensure consistent casing across all operations~~ DONE
 2. **Model-Specific Parsing**: Add timbre parsing for other Korg models
 3. **Visual Reference Browser**: GUI to explore program/combi relationships
 4. **Batch Operations**: Copy/paste multiple banks at once
