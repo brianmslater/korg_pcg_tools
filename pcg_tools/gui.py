@@ -208,20 +208,26 @@ class PcgWindow:
     def _create_patch_list(self, parent, list_type):
         """Create a patch list view with drag-and-drop support."""
         # Treeview
-        columns = ('ID', 'Name', 'Category', 'Favorite')
+        columns = ('ID', 'Name', 'Engine', 'Info', 'Category', 'Sub-Category', 'Favorite')
         tree = ttk.Treeview(parent, columns=columns, show='tree headings', selectmode='extended')
         
         tree.heading('#0', text='Bank')
         tree.heading('ID', text='ID')
         tree.heading('Name', text='Name')
+        tree.heading('Engine', text='Engine')
+        tree.heading('Info', text='Info')
         tree.heading('Category', text='Category')
+        tree.heading('Sub-Category', text='Sub-Category')
         tree.heading('Favorite', text='Fav')
         
-        tree.column('#0', width=100)
-        tree.column('ID', width=100)
-        tree.column('Name', width=300)
-        tree.column('Category', width=150)
-        tree.column('Favorite', width=50)
+        tree.column('#0', width=80)
+        tree.column('ID', width=90)
+        tree.column('Name', width=220)
+        tree.column('Engine', width=80)
+        tree.column('Info', width=60)
+        tree.column('Category', width=110)
+        tree.column('Sub-Category', width=110)
+        tree.column('Favorite', width=40)
         
         # Scrollbar
         scrollbar = ttk.Scrollbar(parent, orient=tk.VERTICAL, command=tree.yview)
@@ -780,20 +786,26 @@ class PcgWindow:
     
     def _create_all_patches_view(self, parent):
         """Create view showing all patches (programs and combis together)."""
-        columns = ('Type', 'ID', 'Name', 'Category', 'Favorite')
+        columns = ('Type', 'ID', 'Name', 'Engine', 'Info', 'Category', 'Sub-Category', 'Favorite')
         tree = ttk.Treeview(parent, columns=columns, show='headings', selectmode='extended')
         
         tree.heading('Type', text='Type')
         tree.heading('ID', text='ID')
         tree.heading('Name', text='Name')
+        tree.heading('Engine', text='Engine')
+        tree.heading('Info', text='Info')
         tree.heading('Category', text='Category')
+        tree.heading('Sub-Category', text='Sub-Category')
         tree.heading('Favorite', text='Fav')
         
-        tree.column('Type', width=80)
-        tree.column('ID', width=100)
-        tree.column('Name', width=300)
-        tree.column('Category', width=150)
-        tree.column('Favorite', width=50)
+        tree.column('Type', width=70)
+        tree.column('ID', width=90)
+        tree.column('Name', width=180)
+        tree.column('Engine', width=80)
+        tree.column('Info', width=60)
+        tree.column('Category', width=110)
+        tree.column('Sub-Category', width=110)
+        tree.column('Favorite', width=40)
         
         scrollbar = ttk.Scrollbar(parent, orient=tk.VERTICAL, command=tree.yview)
         tree.configure(yscrollcommand=scrollbar.set)
@@ -1496,8 +1508,19 @@ class PcgWindow:
             bank_node = self.programs_tree.insert('', 'end', text=f"Bank {bank.bank_id}")
             for prog in bank.patches:
                 cat = prog.category.name if prog.category else ""
+                sub_cat = prog.category.sub_name if prog.category else ""
                 fav = "✓" if prog.favorite else ""
-                self.programs_tree.insert(bank_node, 'end', values=(prog.id, prog.name, cat, fav))
+                # Get engine, ensure it's a string
+                engine = getattr(prog, 'engine', '')
+                if not isinstance(engine, str):
+                    engine = str(engine) if engine else ""
+                # Determine info based on bank
+                info = ""
+                if prog.bank.startswith("I-") and len(prog.bank) > 3:  # EXi banks like I-AA, I-AB
+                    info = "EXi"
+                elif prog.bank.startswith("U-"):  # User banks
+                    info = "User"
+                self.programs_tree.insert(bank_node, 'end', values=(prog.id, prog.name, engine, info, cat, sub_cat, fav))
         
         # Update combis tree
         self.combis_tree.delete(*self.combis_tree.get_children())
@@ -1505,21 +1528,42 @@ class PcgWindow:
             bank_node = self.combis_tree.insert('', 'end', text=f"Bank {bank.bank_id}")
             for combi in bank.patches:
                 cat = combi.category.name if combi.category else ""
+                sub_cat = combi.category.sub_name if combi.category else ""
                 fav = "✓" if combi.favorite else ""
-                self.combis_tree.insert(bank_node, 'end', values=(combi.id, combi.name, cat, fav))
+                # Determine info based on bank
+                info = ""
+                if combi.bank.startswith("U-"):  # User banks
+                    info = "User"
+                self.combis_tree.insert(bank_node, 'end', values=(combi.id, combi.name, "N/A", info, cat, sub_cat, fav))
         
         # Update all patches tree
         self.all_tree.delete(*self.all_tree.get_children())
         for bank in self.pcg.program_banks:
             for prog in bank.patches:
                 cat = prog.category.name if prog.category else ""
+                sub_cat = prog.category.sub_name if prog.category else ""
                 fav = "✓" if prog.favorite else ""
-                self.all_tree.insert('', 'end', values=("Program", prog.id, prog.name, cat, fav))
+                # Get engine, ensure it's a string
+                engine = getattr(prog, 'engine', '')
+                if not isinstance(engine, str):
+                    engine = str(engine) if engine else ""
+                # Determine info
+                info = ""
+                if prog.bank.startswith("I-") and len(prog.bank) > 3:
+                    info = "EXi"
+                elif prog.bank.startswith("U-"):
+                    info = "User"
+                self.all_tree.insert('', 'end', values=("Program", prog.id, prog.name, engine, info, cat, sub_cat, fav))
         for bank in self.pcg.combi_banks:
             for combi in bank.patches:
                 cat = combi.category.name if combi.category else ""
+                sub_cat = combi.category.sub_name if combi.category else ""
                 fav = "✓" if combi.favorite else ""
-                self.all_tree.insert('', 'end', values=("Combi", combi.id, combi.name, cat, fav))
+                # Determine info
+                info = ""
+                if combi.bank.startswith("U-"):
+                    info = "User"
+                self.all_tree.insert('', 'end', values=("Combi", combi.id, combi.name, "N/A", info, cat, sub_cat, fav))
         
         # Update set lists tree
         self.setlists_tree.delete(*self.setlists_tree.get_children())
@@ -1901,6 +1945,12 @@ class PcgToolsGUI:
         """Create menu bar."""
         menubar = tk.Menu(self.root)
         self.root.config(menu=menubar)
+        
+        # macOS-specific: Create application menu
+        if self.root.tk.call('tk', 'windowingsystem') == 'aqua':
+            app_menu = tk.Menu(menubar, name='apple')
+            menubar.add_cascade(menu=app_menu)
+            app_menu.add_command(label='About PCG Tools', command=self.show_about)
         
         # File menu
         file_menu = tk.Menu(menubar, tearoff=0)

@@ -50,6 +50,7 @@ class Program:
     name: str
     category: Optional[Category] = None
     favorite: bool = False
+    engine: str = ""  # Engine type (HD-1, AL-1, CX-3, STR-1, EP-1, etc.)
     raw_data: bytes = b''
     
     @property

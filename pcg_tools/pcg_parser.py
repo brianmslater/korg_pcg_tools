@@ -148,12 +148,19 @@ class PcgBinaryParser:
             if i < 3:  # Debug first 3 programs
                 debug_print(f"  Program {i}: {name}")
             
+            # Extract engine information
+            engine = self._extract_engine(self.data[offset:offset+program_size])
+            
             program = Program(
                 bank=bank_name,
                 index=i,
                 name=name,
+                engine=engine,
                 raw_data=self.data[offset:offset+program_size]
             )
+            
+            # Track offset for writing back
+            program._raw_offset = offset
             
             bank.patches.append(program)
             offset += program_size
@@ -215,18 +222,100 @@ class PcgBinaryParser:
             bank = Bank(bank_id=bank_id, bank_type='Program')
             
             for idx, name, prog_offset in programs:
+                # Extract engine information
+                engine = self._extract_engine(self.data[prog_offset:prog_offset+program_size])
+                
                 program = Program(
                     bank=bank_id,
                     index=idx,
                     name=name,
+                    engine=engine,
                     raw_data=self.data[prog_offset:prog_offset+program_size]
                 )
+                
+                # Track offset for writing back
+                program._raw_offset = prog_offset
+                
                 bank.patches.append(program)
             
             pcg.program_banks.append(bank)
             debug_print(f"  Added bank {bank_id} with {len(programs)} programs")
         
         return start_offset + 8 + chunk_size + 12
+    
+    def _extract_engine(self, program_data: bytes) -> str:
+        """Extract engine type from program data.
+        
+        For Kronos programs, the engine type is encoded in the program data.
+        Common engines: HD-1, AL-1, CX-3, STR-1, EP-1, MS-20EX, PolysixEX, MOD-7, SGX-1, SGX-2
+        """
+        if len(program_data) < 100:
+            return ""
+        
+        # Engine type is typically at offset 0x58 (88) for Kronos
+        # It's a 2-byte value that maps to engine types
+        try:
+            engine_byte = program_data[0x58] if len(program_data) > 0x58 else 0
+            
+            # Kronos engine mapping (based on analysis of real PCG files)
+            engine_map = {
+                0x00: "HD-1",      # HD-1 Synthesizer (default)
+                0x01: "HD-1",      # HD-1 (alternate)
+                0x02: "HD-1",      # HD-1 (pads)
+                0x04: "SGX-1",     # SGX-1 Piano
+                0x05: "SGX-1",     # SGX-1 (harpsichord)
+                0x08: "SGX-1",     # SGX-1 (alternate)
+                0x0B: "SGX-1",     # SGX-1 Piano
+                0x0C: "MS-20EX",   # MS-20EX Analog
+                0x0D: "PolysixEX", # PolysixEX Analog
+                0x0E: "MOD-7",     # MOD-7 VPM
+                0x13: "SGX-2",     # SGX-2 Electric Piano (MK I, etc.)
+                0x15: "SGX-2",     # SGX-2 Electric Piano (alternate)
+                0x1B: "CX-3",      # CX-3 Organ
+                0x1F: "STR-1",     # STR-1 Strings
+                0x21: "HD-1",      # HD-1 (alternate)
+                0x22: "HD-1",      # HD-1 (alternate)
+                0x23: "AL-1",      # AL-1 Analog Synthesizer
+                0x25: "AL-1",      # AL-1 Analog Synthesizer (vintage)
+                0x27: "AL-1",      # AL-1 Analog Synthesizer (alternate)
+                0x28: "HD-1",      # HD-1 Synthesizer
+                0x29: "AL-1",      # AL-1 Analog Synthesizer  
+                0x2A: "STR-1",     # STR-1 String Synthesizer
+                0x2B: "SGX-2",     # SGX-2 Electric Piano
+                0x2C: "MOD-7",     # MOD-7 Waveshaping VPM
+                0x2D: "CX-3",      # CX-3 Tonewheel Organ
+                0x2E: "MOD-7",     # MOD-7 (alternate)
+                0x30: "MOD-7",     # MOD-7 (alternate)
+                0x33: "STR-1",     # STR-1 (alternate)
+                0x38: "SGX-1",     # SGX-1 Piano (alternate)
+                0x39: "SGX-2",     # SGX-2 EP (alternate)
+                0x40: "EXi",       # EXi sample-based
+                0x4D: "EXi",       # EXi sample-based (alternate)
+                0x52: "EXi",       # EXi sample-based (alternate)
+                0x55: "EXi",       # EXi sample-based (alternate)
+                0x5A: "EXi",       # EXi sample-based (alternate)
+                0x5B: "EXi",       # EXi sample-based (alternate)
+                0x5D: "AL-1",      # AL-1 (brass/lead)
+                0x64: "EXi",       # EXi sample-based (guitar)
+                0x69: "EXi",       # EXi sample-based (alternate)
+                0x8D: "EXi",       # EXi sample-based (alternate)
+                0x95: "EXi",       # EXi sample-based (alternate)
+                0xC5: "EXi",       # EXi sample-based (alternate)
+            }
+            
+            engine = engine_map.get(engine_byte, f"0x{engine_byte:02X}")
+            
+            # Fallback: search for engine name in ASCII data
+            if engine.startswith("0x"):
+                raw_str = program_data[:200].decode('ascii', errors='ignore')
+                known_engines = ['HD-1', 'AL-1', 'CX-3', 'STR-1', 'EP-1', 'MS-20', 'Polysix', 'MOD-7', 'SGX-1', 'SGX-2']
+                for eng in known_engines:
+                    if eng in raw_str:
+                        return eng
+            
+            return engine
+        except:
+            return ""
     
     def _decode_bank_id(self, bank_id_raw: int, is_combi: bool) -> str:
         """Decode raw bank ID to human-readable format.
@@ -300,7 +389,19 @@ class PcgBinaryParser:
                     break
     
     def parse_sls1_chunk(self, pcg: PcgFile):
-        """Parse SLS1 chunk containing set lists."""
+        """Parse SLS1 chunk containing set lists.
+        
+        Kronos SLS1 structure (discovered through binary analysis):
+        - SLS1 header contains sub-chunks (SLD1, SDB1)
+        - First entry: "Preload Set List" (skip)
+        - Next 16 entries: Setlist names with marker (1E 02 00 00) + 24-byte name
+        - Following entries: Slot names (128 per setlist × 16 setlists)
+        - After each slot name (at +24): patch reference data (8 bytes)
+          Byte 0-1: Patch index (little-endian)
+          Byte 2: Bank ID
+          Byte 3: Patch type (0x30=Combi, 0x20=Program)
+          Byte 4-5: Transpose/Volume
+        """
         from .models import SetList, SetListSlot
         
         # Search for SLS1 anywhere in the file
@@ -309,117 +410,140 @@ class PcgBinaryParser:
             debug_print("SLS1 chunk not found")
             return
         
-        offset = sls1_offset
-        chunk_size = self.get_int(offset + 4, 4)
-        debug_print(f"Found SLS1 at offset {offset:08X}, size {chunk_size:08X}")
-        
         pcg.has_set_lists = True
         
-        # Parse set list data
-        # SLS1 structure (Kronos):
-        # - Header (8 bytes): 'SLS1' + size
-        # - Number of set lists (4 bytes)
-        # - For each set list:
-        #   - Name (24 bytes)
-        #   - Number of slots (4 bytes)
-        #   - For each slot:
-        #     - Name (24 bytes)
-        #     - Patch type (1 byte: 0=Program, 1=Combi)
-        #     - Patch bank (2 bytes)
-        #     - Patch number (2 bytes)
-        #     - Transpose (1 byte, signed)
-        #     - Volume (1 byte)
-        #     - Other parameters...
+        # Search for the marker pattern that precedes names: 1E 02 00 00
+        marker = b'\x1E\x02\x00\x00'
         
-        try:
-            data_offset = offset + 8  # Skip header
+        # Find all occurrences of the marker after SLS1
+        name_offsets = []
+        search_start = sls1_offset + 8
+        pos = search_start
+        
+        while pos < len(self.data) - 32:
+            pos = self.data.find(marker, pos)
+            if pos == -1:
+                break
+            # Check if this is within reasonable range (first 100KB after SLS1)
+            if pos - sls1_offset > 100000:
+                break
+            name_offsets.append(pos + 4)  # Skip marker, point to name
+            pos += 4
+        
+        if not name_offsets:
+            debug_print("No setlist names found")
+            return
+        
+        debug_print(f"Found {len(name_offsets)} potential name entries")
+        
+        # Parse as 16 setlists with 128 slots each
+        # Structure: First 16 marker entries are setlist names
+        # Then 128 slot names for each setlist (16 × 128 = 2048 slots)
+        num_setlists = 16
+        slots_per_setlist = 128
+        
+        # Parse each setlist
+        for sl_idx in range(num_setlists):
+            if sl_idx >= len(name_offsets):
+                break
             
-            # Try to parse set lists
-            # This is a simplified parser - real format may vary
-            num_setlists = min(self.get_int(data_offset, 4), 16)  # Max 16 set lists
-            data_offset += 4
+            offset = name_offsets[sl_idx]
+            sl_name = self.get_string(offset, 24)
+            if not sl_name:
+                sl_name = f"Set List {sl_idx + 1}"
             
-            debug_print(f"Number of set lists: {num_setlists}")
+            setlist = SetList(
+                index=sl_idx,
+                name=sl_name,
+                description="",
+                color=0
+            )
             
-            for sl_idx in range(num_setlists):
-                if data_offset + 32 > len(self.data):
+            # Slot names start after the 16 setlist names
+            slot_start_idx = num_setlists + (sl_idx * slots_per_setlist)
+            
+            for slot_idx in range(slots_per_setlist):
+                name_idx = slot_start_idx + slot_idx
+                if name_idx >= len(name_offsets):
                     break
                 
-                # Read set list name
-                sl_name = self.get_string(data_offset, 24)
-                if not sl_name:
-                    sl_name = f"Set List {sl_idx}"
-                data_offset += 24
+                offset = name_offsets[name_idx]
+                slot_name = self.get_string(offset, 24)
                 
-                # Read number of slots
-                num_slots = min(self.get_int(data_offset, 4), 128)  # Max 128 slots
-                data_offset += 4
+                # Skip empty slots
+                if not slot_name or len(slot_name) < 2:
+                    continue
                 
-                debug_print(f"Set list {sl_idx}: {sl_name}, {num_slots} slots")
+                # Parse patch reference data (8 bytes after the 24-byte name)
+                patch_data_offset = offset + 24
+                patch_type = "Combi"
+                patch_bank = "I-A"
+                patch_index = 0
+                transpose = 0
+                volume = 127
                 
-                setlist = SetList(
-                    index=sl_idx,
-                    name=sl_name,
-                    description="",
-                    color=0
+                if patch_data_offset + 8 <= len(self.data):
+                    try:
+                        # Read patch reference bytes
+                        patch_idx_low = self.data[patch_data_offset]
+                        patch_idx_high = self.data[patch_data_offset + 1]
+                        patch_index = patch_idx_low + (patch_idx_high << 8)
+                        
+                        bank_byte = self.data[patch_data_offset + 2]
+                        type_byte = self.data[patch_data_offset + 3]
+                        
+                        # Decode patch type
+                        if type_byte == 0x30:
+                            patch_type = "Combi"
+                        elif type_byte == 0x20:
+                            patch_type = "Program"
+                        
+                        # Decode bank ID
+                        # Bank byte format: 0x00-0x07 = I-A to I-H, 0x20+ = User banks
+                        if bank_byte < 0x08:
+                            patch_bank = f"I-{chr(65 + bank_byte)}"
+                        elif bank_byte >= 0x20:
+                            user_idx = bank_byte - 0x20
+                            if user_idx < 8:
+                                patch_bank = f"U-{chr(65 + user_idx)}"
+                            else:
+                                patch_bank = f"U-{user_idx}"
+                        else:
+                            # EXi or other special banks
+                            patch_bank = f"I-{chr(65 + (bank_byte & 0x0F))}"
+                        
+                        # Transpose and volume
+                        if patch_data_offset + 5 < len(self.data):
+                            transpose_byte = self.data[patch_data_offset + 4]
+                            # Transpose is signed, centered at 0x40 (64)
+                            transpose = transpose_byte - 0x40 if transpose_byte < 0x80 else transpose_byte - 0x40
+                            
+                            volume = self.data[patch_data_offset + 5]
+                        
+                        # Validate patch index (should be 0-127)
+                        if patch_index > 127:
+                            patch_index = patch_index & 0x7F  # Take lower 7 bits
+                        
+                    except Exception as e:
+                        debug_print(f"Error parsing patch data for slot {slot_idx}: {e}")
+                
+                slot = SetListSlot(
+                    set_list_index=sl_idx,
+                    slot_index=slot_idx,
+                    name=slot_name,
+                    notes="",
+                    patch_type=patch_type,
+                    patch_bank=patch_bank,
+                    patch_index=patch_index,
+                    transpose=transpose,
+                    volume=volume
                 )
                 
-                # Parse slots
-                for slot_idx in range(num_slots):
-                    if data_offset + 32 > len(self.data):
-                        break
-                    
-                    # Read slot name
-                    slot_name = self.get_string(data_offset, 24)
-                    if not slot_name:
-                        slot_name = f"Slot {slot_idx}"
-                    data_offset += 24
-                    
-                    # Read patch reference
-                    patch_type_byte = self.data[data_offset] if data_offset < len(self.data) else 0
-                    patch_type = "Program" if patch_type_byte == 0 else "Combi"
-                    data_offset += 1
-                    
-                    # Read bank and number
-                    patch_bank_id = self.get_int(data_offset, 2)
-                    data_offset += 2
-                    patch_num = self.get_int(data_offset, 2)
-                    data_offset += 2
-                    
-                    # Convert bank ID to bank string (simplified)
-                    bank_names = ["I-A", "I-B", "I-C", "I-D", "I-E", "I-F", "I-G"]
-                    patch_bank = bank_names[patch_bank_id % len(bank_names)]
-                    
-                    # Read transpose and volume
-                    transpose = struct.unpack('b', self.data[data_offset:data_offset+1])[0] if data_offset < len(self.data) else 0
-                    data_offset += 1
-                    volume = self.data[data_offset] if data_offset < len(self.data) else 127
-                    data_offset += 1
-                    
-                    # Skip other parameters (hold, etc.)
-                    data_offset += 8  # Skip remaining slot data
-                    
-                    slot = SetListSlot(
-                        set_list_index=sl_idx,
-                        slot_index=slot_idx,
-                        name=slot_name,
-                        notes="",
-                        patch_type=patch_type,
-                        patch_bank=patch_bank,
-                        patch_index=patch_num,
-                        transpose=transpose,
-                        volume=volume
-                    )
-                    
-                    setlist.slots.append(slot)
-                    debug_print(f"  Slot {slot_idx}: {slot_name} -> {patch_bank}{patch_num:03d}")
-                
-                pcg.set_lists.append(setlist)
-                
-        except Exception as e:
-            debug_print(f"Error parsing set lists: {e}")
-            # If parsing fails, at least we know set lists exist
-            pass
+                setlist.slots.append(slot)
+            
+            # Add setlist even if empty (to maintain indices)
+            pcg.set_lists.append(setlist)
+            debug_print(f"Set list {sl_idx}: {sl_name}, {len(setlist.slots)} slots")
     
     def _parse_cbk1_chunk(self, pcg: PcgFile, offset: int) -> int:
         """Parse a CBK1 (Combi Bank) chunk."""
@@ -486,6 +610,10 @@ class PcgBinaryParser:
                     timbres=timbres,
                     raw_data=self.data[combi_offset:combi_offset+7810]
                 )
+                
+                # Track offset for writing back
+                combi._raw_offset = combi_offset
+                
                 bank.patches.append(combi)
                 debug_print(f"  Combi {idx}: {name} with {len(timbres)} timbres")
             

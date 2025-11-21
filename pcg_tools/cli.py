@@ -104,7 +104,20 @@ def export(input_file, output_file, format):
 def gui():
     """Launch the graphical user interface."""
     try:
-        from .gui import launch_gui
+        import sys
+        import platform
+        
+        # Use macOS-compatible GUI for old Tk versions
+        if platform.system() == 'Darwin':
+            import tkinter
+            if tkinter.TkVersion < 8.6:
+                click.echo("Using macOS-compatible GUI (Tk 8.5 detected)")
+                from .gui_macos import launch_gui
+            else:
+                from .gui import launch_gui
+        else:
+            from .gui import launch_gui
+        
         launch_gui()
     except ImportError as e:
         click.echo(f"Error: GUI dependencies not available: {e}", err=True)

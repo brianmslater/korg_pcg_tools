@@ -13,12 +13,44 @@ class PcgWriter:
     
     def write(self, filepath: str):
         """Write PCG file to disk."""
-        # For now, if we haven't modified the structure, write the raw data
+        # Update raw_data with any modified patch data before writing
         if self.pcg.raw_data:
+            self._update_raw_data()
             with open(filepath, 'wb') as f:
                 f.write(self.pcg.raw_data)
         else:
             raise NotImplementedError("Creating new PCG files from scratch not yet implemented")
+    
+    def _update_raw_data(self):
+        """Update the PCG raw_data with modified patch data.
+        
+        This ensures that any changes made to patch names or properties
+        are reflected in the raw binary data before writing to disk.
+        """
+        if not self.pcg.raw_data:
+            return
+        
+        raw_data = bytearray(self.pcg.raw_data)
+        
+        # Update program data
+        for bank in self.pcg.program_banks:
+            for prog in bank.patches:
+                if prog.raw_data and hasattr(prog, '_raw_offset'):
+                    # If we tracked the offset, update it in place
+                    offset = prog._raw_offset
+                    if offset + len(prog.raw_data) <= len(raw_data):
+                        raw_data[offset:offset+len(prog.raw_data)] = prog.raw_data
+        
+        # Update combi data
+        for bank in self.pcg.combi_banks:
+            for combi in bank.patches:
+                if combi.raw_data and hasattr(combi, '_raw_offset'):
+                    # If we tracked the offset, update it in place
+                    offset = combi._raw_offset
+                    if offset + len(combi.raw_data) <= len(raw_data):
+                        raw_data[offset:offset+len(combi.raw_data)] = combi.raw_data
+        
+        self.pcg.raw_data = bytes(raw_data)
     
     def _build_header(self) -> bytes:
         """Build PCG file header."""
