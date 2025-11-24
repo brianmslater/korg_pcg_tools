@@ -51,3 +51,6 @@ exports/
 
 # Keep test files
 !test_files/**/*.pcg
+._*
+venv_tk/
+*.PCG
