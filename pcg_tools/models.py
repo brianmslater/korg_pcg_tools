@@ -173,7 +173,7 @@ class SetListSlot:
     patch_type: str = ""  # "Program" or "Combi"
     patch_bank: str = ""
     patch_index: int = 0
-    transpose: int = 0
+    _transpose: int = 0  # Internal storage
     volume: int = 127
     hold: bool = False
     color: int = 0  # Color value (byte from STL1/SBK1 at +24)
@@ -241,6 +241,49 @@ class SetListSlot:
     def text_size_name(self) -> str:
         """Return human-readable text size name."""
         return self.text_size.name
+    
+    @property
+    def transpose(self) -> int:
+        """Get transpose from split bit fields (signed 6-bit).
+        
+        Transpose is stored as 6 bits split across two bytes:
+        - MSB (3 bits): Byte +25, bits 7-5
+        - LSB (3 bits): Byte +29, bits 7-5
+        Range: -24 to +24 semitones
+        
+        Returns:
+            Transpose value in semitones
+        """
+        if self.raw_data and len(self.raw_data) >= 30:
+            from .bit_utils import get_bits, to_signed_bit
+            # MSB (3 bits): Byte +25, bits 7-5
+            msb = get_bits(self.raw_data, 25, 7, 5)
+            # LSB (3 bits): Byte +29, bits 7-5
+            lsb = get_bits(self.raw_data, 29, 7, 5)
+            unsigned = (msb << 3) | lsb
+            # Convert to signed 6-bit value
+            return to_signed_bit(6, unsigned)
+        return self._transpose
+    
+    @transpose.setter
+    def transpose(self, value: int) -> None:
+        """Set transpose in split bit fields (signed 6-bit).
+        
+        Args:
+            value: Transpose in semitones (-24 to +24)
+        """
+        # Clamp to valid range
+        value = max(-24, min(24, value))
+        self._transpose = value
+        
+        if self.raw_data and len(self.raw_data) >= 30:
+            from .bit_utils import set_bits, from_signed_bit
+            # Convert to unsigned 6-bit
+            unsigned = from_signed_bit(6, value)
+            # MSB (3 bits) -> byte +25, bits 7-5
+            set_bits(self.raw_data, 25, 7, 5, (unsigned >> 3) & 0x07)
+            # LSB (3 bits) -> byte +29, bits 7-5
+            set_bits(self.raw_data, 29, 7, 5, unsigned & 0x07)
 
 
 @dataclass
