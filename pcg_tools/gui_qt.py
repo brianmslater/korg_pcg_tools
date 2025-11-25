@@ -400,21 +400,24 @@ class PcgMainWindow(QMainWindow):
         """Get QColor for display based on slot color value."""
         from PySide6.QtGui import QColor
         
-        # Map color values to RGB colors for display
+        # Map color values to RGB colors for display (all 16 official Kronos colors)
         color_map = {
-            0: None,  # Default - no color
-            16: QColor(220, 50, 50),    # Red
-            24: QColor(255, 140, 0),    # Orange
-            32: QColor(75, 0, 130),     # Indigo
-            40: QColor(255, 215, 0),    # Yellow
-            48: QColor(50, 205, 50),    # Green
-            56: QColor(0, 191, 255),    # Cyan
-            72: QColor(138, 43, 226),   # Violet
-            140: QColor(128, 0, 32),    # Burgundy
-            148: QColor(128, 0, 128),   # Purple
-            160: QColor(65, 105, 225),  # Blue
-            164: QColor(0, 0, 128),     # Navy
-            204: QColor(128, 128, 0),   # Olive
+            0: None,  # Default - no background color
+            136: QColor(178, 34, 34),      # Brick - dark red
+            140: QColor(128, 0, 32),       # Burgundy - deep red
+            144: QColor(34, 139, 34),      # Ivy - forest green
+            148: QColor(128, 128, 0),      # Olive - yellow-green
+            152: QColor(255, 215, 0),      # Gold - bright yellow
+            156: QColor(139, 69, 19),      # Cacao - brown
+            160: QColor(75, 0, 130),       # Indigo - blue-purple
+            164: QColor(0, 0, 128),        # Navy - dark blue
+            168: QColor(255, 182, 193),    # Rose - pink
+            172: QColor(230, 230, 250),    # Lavender - light purple
+            176: QColor(135, 206, 250),    # Azure - light blue
+            180: QColor(21, 96, 189),      # Denim - medium blue
+            184: QColor(192, 192, 192),    # Silver - light gray
+            188: QColor(112, 128, 144),    # Slate - blue-gray
+            196: QColor(54, 69, 79),       # Charcoal - dark gray
         }
         
         return color_map.get(color_value, QColor(200, 200, 200))  # Light gray for unknown

@@ -30,41 +30,52 @@ class SlotTextSize(Enum):
     XL = 16  # Extra Large (confirmed)
 
 
-# Slot color mapping - based on analysis of real files
-# Values found in Movie Themes file: 32, 140, 160, 164, 148, 204
+# Complete Kronos setlist slot colors (all 16 official colors)
+# Values confirmed from "SETLIST Movie TV Themes LOAD SEPARATELY 2.PCG" analysis
 SLOT_COLORS = {
-    0: "Default/White",
-    32: "Indigo",
+    0: "Default",
+    136: "Brick",
     140: "Burgundy",
-    148: "Purple",      # Estimated from value proximity
-    160: "Blue",        # Estimated
-    164: "Navy",        # Estimated
-    204: "Olive",       # Estimated
-    # Common Kronos colors (estimated values)
-    16: "Red",
-    24: "Orange", 
-    40: "Yellow",
-    48: "Green",
-    56: "Cyan",
-    72: "Violet",
+    144: "Ivy",
+    148: "Olive",
+    152: "Gold",
+    156: "Cacao",
+    160: "Indigo",
+    164: "Navy",
+    168: "Rose",
+    172: "Lavender",
+    176: "Azure",
+    180: "Denim",
+    184: "Silver",
+    188: "Slate",
+    196: "Charcoal",
 }
 
-# Reverse mapping for writing
+# Reverse mapping for writing (all 16 colors)
 SLOT_COLOR_VALUES = {
-    "Default/White": 0,
-    "Red": 16,
-    "Orange": 24,
-    "Indigo": 32,
-    "Yellow": 40,
-    "Green": 48,
-    "Cyan": 56,
-    "Violet": 72,
+    "Default": 0,
+    "Brick": 136,
     "Burgundy": 140,
-    "Purple": 148,
-    "Blue": 160,
+    "Ivy": 144,
+    "Olive": 148,
+    "Gold": 152,
+    "Cacao": 156,
+    "Indigo": 160,
     "Navy": 164,
-    "Olive": 204,
+    "Rose": 168,
+    "Lavender": 172,
+    "Azure": 176,
+    "Denim": 180,
+    "Silver": 184,
+    "Slate": 188,
+    "Charcoal": 196,
 }
+
+# Official Kronos color list (alphabetical for reference)
+OFFICIAL_KRONOS_COLORS = [
+    "Azure", "Brick", "Burgundy", "Cacao", "Charcoal", "Default", "Denim", "Gold",
+    "Indigo", "Ivy", "Lavender", "Navy", "Olive", "Rose", "Silver", "Slate"
+]
 
 
 @dataclass
