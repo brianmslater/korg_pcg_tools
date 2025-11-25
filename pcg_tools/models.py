@@ -174,7 +174,7 @@ class SetListSlot:
     patch_bank: str = ""
     patch_index: int = 0
     _transpose: int = 0  # Internal storage
-    volume: int = 127
+    _volume: int = 127  # Internal storage
     hold: bool = False
     color: int = 0  # Color value (byte from STL1/SBK1 at +24)
     raw_data: Optional[bytearray] = None  # Raw slot data for bit-level operations
@@ -367,6 +367,32 @@ class SetListSlot:
             set_bits(self.raw_data, 25, 7, 5, (unsigned >> 3) & 0x07)
             # LSB (3 bits) -> byte +29, bits 7-5
             set_bits(self.raw_data, 29, 7, 5, unsigned & 0x07)
+    
+    @property
+    def volume(self) -> int:
+        """Get volume from raw data.
+        
+        Volume is stored at byte +28.
+        Range: 0-127
+        
+        Returns:
+            Volume value
+        """
+        if self.raw_data and len(self.raw_data) >= 29:
+            return self.raw_data[28]
+        return self._volume
+    
+    @volume.setter
+    def volume(self, value: int) -> None:
+        """Set volume in raw data.
+        
+        Args:
+            value: Volume (0-127)
+        """
+        value = max(0, min(127, value))
+        self._volume = value
+        if self.raw_data and len(self.raw_data) >= 29:
+            self.raw_data[28] = value
     
     @property
     def description(self) -> str:
