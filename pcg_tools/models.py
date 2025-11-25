@@ -35,17 +35,23 @@ class SlotTextSize(Enum):
 SLOT_COLORS = {
     0: "Default",
     136: "Brick",
+    137: "Brick",      # Variant found in Preload setlists
     140: "Burgundy",
     144: "Ivy",
     148: "Olive",
     152: "Gold",
+    153: "Gold",       # Variant found in Preload setlists
     156: "Cacao",
+    157: "Cacao",      # Variant found in Preload setlists
     160: "Indigo",
     164: "Navy",
+    165: "Navy",       # Variant found in Preload setlists
     168: "Rose",
     172: "Lavender",
+    174: "Lavender",   # Variant found in Preload setlists
     176: "Azure",
     180: "Denim",
+    181: "Denim",      # Variant found in Preload setlists
     184: "Silver",
     188: "Slate",
     196: "Charcoal",
