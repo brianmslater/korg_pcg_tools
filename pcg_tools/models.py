@@ -243,6 +243,89 @@ class SetListSlot:
         return self.text_size.name
     
     @property
+    def patch_type_value(self) -> int:
+        """Get patch type from raw data.
+        
+        Patch type is stored at byte +24, bits 1-0:
+        - 0 = Program
+        - 1 = Combi
+        - 2 = Song
+        
+        Returns:
+            Patch type value (0-2)
+        """
+        if self.raw_data and len(self.raw_data) >= 25:
+            from .bit_utils import get_bits
+            return get_bits(self.raw_data, 24, 1, 0)
+        # Map string to value
+        type_map = {'Program': 0, 'Combi': 1, 'Song': 2}
+        return type_map.get(self.patch_type, 0)
+    
+    @patch_type_value.setter
+    def patch_type_value(self, value: int) -> None:
+        """Set patch type in raw data.
+        
+        Args:
+            value: Patch type value (0=Program, 1=Combi, 2=Song)
+        """
+        value_map = {0: 'Program', 1: 'Combi', 2: 'Song'}
+        self.patch_type = value_map.get(value, 'Program')
+        
+        if self.raw_data and len(self.raw_data) >= 25:
+            from .bit_utils import set_bits
+            set_bits(self.raw_data, 24, 1, 0, value & 0x03)
+    
+    @property
+    def patch_bank_id(self) -> int:
+        """Get referenced bank ID from raw data.
+        
+        Bank ID is stored at byte +25, bits 4-0 (lower 5 bits).
+        Bits 7-5 are used by transpose MSB.
+        
+        Returns:
+            Bank ID (0-31)
+        """
+        if self.raw_data and len(self.raw_data) >= 26:
+            from .bit_utils import get_bits
+            return get_bits(self.raw_data, 25, 4, 0)
+        return 0
+    
+    @patch_bank_id.setter
+    def patch_bank_id(self, value: int) -> None:
+        """Set referenced bank ID in raw data.
+        
+        Args:
+            value: Bank ID (0-31)
+        """
+        if self.raw_data and len(self.raw_data) >= 26:
+            from .bit_utils import set_bits
+            set_bits(self.raw_data, 25, 4, 0, value & 0x1F)
+    
+    @property
+    def patch_index_value(self) -> int:
+        """Get referenced patch index from raw data.
+        
+        Patch index is stored at byte +26.
+        
+        Returns:
+            Patch index (0-127)
+        """
+        if self.raw_data and len(self.raw_data) >= 27:
+            return self.raw_data[26]
+        return self.patch_index
+    
+    @patch_index_value.setter
+    def patch_index_value(self, value: int) -> None:
+        """Set referenced patch index in raw data.
+        
+        Args:
+            value: Patch index (0-127)
+        """
+        self.patch_index = value & 0x7F
+        if self.raw_data and len(self.raw_data) >= 27:
+            self.raw_data[26] = value & 0x7F
+    
+    @property
     def transpose(self) -> int:
         """Get transpose from split bit fields (signed 6-bit).
         
