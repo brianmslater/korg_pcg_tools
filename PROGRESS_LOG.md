@@ -47,6 +47,72 @@ Ran 18 tests in 0.001s
 OK
 ```
 
+#### Phase 2: Text Size Implementation ✅
+**Time**: ~20 minutes  
+**Status**: COMPLETE
+
+**What Was Done**:
+1. Updated `SlotTextSize` enum with correct values (0-4)
+2. Added `raw_data` field to `SetListSlot` for bit-level operations
+3. Implemented `text_size` property with split bit field encoding:
+   - MSB (1 bit) at byte +29, bit 4
+   - LSB (2 bits) at byte +24, bits 7-6
+4. Created comprehensive test suite `test_text_size.py`:
+   - 6 unit tests covering all text sizes
+   - Tests for split bit encoding
+   - Tests for bit preservation
+   - All tests passing ✅
+
+**Key Achievements**:
+- All 5 text sizes (S, XS, M, L, XL) now supported
+- Proper split bit field encoding matches C# implementation
+- Preserves other bits in shared bytes
+
+**Files Modified**:
+- `korg_pcg_tools/pcg_tools/models.py`
+
+**Files Created**:
+- `korg_pcg_tools/test_text_size.py` (140 lines)
+
+**Test Results**:
+```
+Ran 6 tests in 0.001s
+OK
+```
+
+#### Phase 3: Enhanced Transpose Handling ✅
+**Time**: ~20 minutes  
+**Status**: COMPLETE
+
+**What Was Done**:
+1. Converted `transpose` to property with split bit field encoding:
+   - MSB (3 bits) at byte +25, bits 7-5
+   - LSB (3 bits) at byte +29, bits 7-5
+   - Signed 6-bit value (-24 to +24 semitones)
+2. Added automatic clamping to valid range
+3. Created comprehensive test suite `test_transpose.py`:
+   - 8 unit tests covering positive/negative values
+   - Tests for clamping, bit preservation
+   - Tests for independence from text_size
+   - All tests passing ✅
+
+**Key Achievements**:
+- Proper signed 6-bit encoding for transpose
+- Full range support (-24 to +24)
+- Verified independence from text_size field
+
+**Files Modified**:
+- `korg_pcg_tools/pcg_tools/models.py`
+
+**Files Created**:
+- `korg_pcg_tools/test_transpose.py` (180 lines)
+
+**Test Results**:
+```
+Ran 8 tests in 0.002s
+OK
+```
+
 ---
 
 ## Next Steps
@@ -66,12 +132,12 @@ OK
 
 ## Progress Summary
 
-**Overall**: 8/99 tasks (8%)
+**Overall**: 22/99 tasks (22%)
 
 **Phase Status**:
 - ✅ Phase 1: 8/8 tasks (100%) - COMPLETE
-- ⏳ Phase 2: 0/7 tasks (0%)
-- ⏳ Phase 3: 0/7 tasks (0%)
+- ✅ Phase 2: 7/7 tasks (100%) - COMPLETE
+- ✅ Phase 3: 7/7 tasks (100%) - COMPLETE
 - ⏳ Phase 4: 0/10 tasks (0%)
 - ⏳ Phase 5: 0/12 tasks (0%)
 - ⏳ Phase 6: 0/12 tasks (0%)
@@ -103,6 +169,18 @@ OK
 1. **5565eb4** - "Add bit manipulation utilities module"
    - Added bit_utils.py with 7 functions
    - Added test_bit_utils.py with 18 tests
+   - All tests passing
+
+2. **fbd6b51** - "Implement text size reading and writing for setlist slots"
+   - Updated SlotTextSize enum with correct values
+   - Added raw_data field and text_size property
+   - Added test_text_size.py with 6 tests
+   - All tests passing
+
+3. **fcb840f** - "Implement enhanced transpose handling with split bit fields"
+   - Converted transpose to property with split bit encoding
+   - Added automatic clamping
+   - Added test_transpose.py with 8 tests
    - All tests passing
 
 ---
