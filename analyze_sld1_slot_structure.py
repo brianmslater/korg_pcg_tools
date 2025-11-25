@@ -1,73 +1,89 @@
 #!/usr/bin/env python3
-"""Analyze the structure of a single slot entry in SLD1."""
+"""Analyze SLD1 slot structure in detail."""
 
 import struct
-from pathlib import Path
 
-test_file = '/Volumes/KEYBOARD/Nightwish Legacy/KRONOS/nw.PCG'
+def get_string(data, offset, length):
+    """Read null-terminated ASCII string."""
+    string_data = data[offset:offset+length]
+    null_pos = string_data.find(b'\x00')
+    if null_pos >= 0:
+        string_data = string_data[:null_pos]
+    return string_data.decode('ascii', errors='ignore').strip()
 
-with open(test_file, 'rb') as f:
-    data = f.read()
-
-# Focus on SLEEPING INTRO slot
-slot_name_pos = data.find(b'SLEEPING INTRO')
-print(f"SLEEPING INTRO at: 0x{slot_name_pos:08X}\n")
-
-# The name is 24 bytes
-name_bytes = data[slot_name_pos:slot_name_pos+24]
-print(f"Name (24 bytes): {name_bytes.hex()}")
-name_str = name_bytes.split(b'\x00')[0].decode()
-print(f"Name string: '{name_str}'")
-
-# After the name, there should be slot parameters
-params_start = slot_name_pos + 24
-print(f"\nParameters after name (64 bytes):")
-for i in range(0, 64, 16):
-    offset = params_start + i
-    hex_str = ' '.join(f'{b:02X}' for b in data[offset:offset+16])
-    ascii_str = ''.join(chr(b) if 32 <= b < 127 else '.' for b in data[offset:offset+16])
-    print(f"  +{i:02d}: {hex_str:<48} {ascii_str}")
-
-# Try to decode some parameters
-print(f"\nDecoding parameters:")
-params = data[params_start:params_start+32]
-
-# Common slot parameters might include:
-# - Transpose (signed byte, -24 to +24)
-# - Volume (0-127)
-# - Patch bank/index
-# - Patch type (Program/Combi)
-
-print(f"  Byte 0: 0x{params[0]:02X} ({params[0]}) - might be transpose+offset")
-print(f"  Byte 1: 0x{params[1]:02X} ({params[1]})")
-print(f"  Byte 2: 0x{params[2]:02X} ({params[2]})")
-print(f"  Byte 3: 0x{params[3]:02X} ({params[3]})")
-print(f"  Byte 4: 0x{params[4]:02X} ({params[4]})")
-print(f"  Byte 5: 0x{params[5]:02X} ({params[5]})")
-print(f"  Byte 6: 0x{params[6]:02X} ({params[6]})")
-print(f"  Byte 7: 0x{params[7]:02X} ({params[7]})")
-
-# Look for CBK1 marker (Combi Bank) before the slot
-print(f"\n\nSearching backwards for chunk markers:")
-for search_back in [100, 200, 500, 1000, 2000]:
-    search_start = max(0, slot_name_pos - search_back)
-    chunk_markers = [b'CBK1', b'PBK1', b'SLD1', b'SLDT']
-    for marker in chunk_markers:
-        pos = data.rfind(marker, search_start, slot_name_pos)
-        if pos >= 0:
-            distance = slot_name_pos - pos
-            print(f"  {marker.decode()} at 0x{pos:08X} (distance: {distance} bytes, 0x{distance:04X})")
+def hex_dump(data, offset, length, label=""):
+    """Print hex dump of data."""
+    if label:
+        print(f"{label}:")
+    for i in range(0, length, 16):
+        if offset+i >= len(data):
             break
-    else:
-        continue
-    break
+        hex_str = ' '.join(f'{b:02X}' for b in data[offset+i:offset+i+16])
+        ascii_str = ''.join(chr(b) if 32 <= b < 127 else '.' for b in data[offset+i:offset+i+16])
+        print(f"  {offset+i:08X}: {hex_str:<48} {ascii_str}")
 
-# Check if there's a pattern before each slot name
-print(f"\n\nLooking for slot entry header:")
-# Go back 32 bytes and look for patterns
-header_start = slot_name_pos - 32
-print(f"32 bytes before name:")
-for i in range(0, 32, 16):
-    offset = header_start + i
-    hex_str = ' '.join(f'{b:02X}' for b in data[offset:offset+16])
-    print(f"  {offset:08X}: {hex_str}")
+def analyze_sld1_slots(filename):
+    """Analyze SLD1 slot structure."""
+    with open(filename, 'rb') as f:
+        data = f.read()
+    
+    # Find first CBK1
+    cbk1_pos = data.find(b'CBK1')
+    if cbk1_pos < 0:
+        print("No CBK1 found")
+        return
+    
+    print(f"First CBK1 at 0x{cbk1_pos:08X}\n")
+    
+    SLOT_SIZE = 7810  # 0x1E82
+    
+    # Analyze first 5 slots
+    for slot_idx in range(5):
+        slot_offset = cbk1_pos + (slot_idx * SLOT_SIZE)
+        
+        print(f"=== SLOT {slot_idx} at 0x{slot_offset:08X} ===")
+        
+        # Check for CBK1 marker (only slot 0 has it)
+        if slot_idx == 0:
+            marker = data[slot_offset:slot_offset+4]
+            print(f"Marker: {marker}")
+            size = struct.unpack('<I', data[slot_offset+4:slot_offset+8])[0]
+            print(f"Size: 0x{size:08X}")
+            name_offset = 24
+        else:
+            # No marker, name is at different offset
+            # Let's search for readable text
+            name_offset = None
+            for test_offset in [0, 4, 8, 12, 16, 20, 24, 28, 32]:
+                test_name = get_string(data, slot_offset + test_offset, 24)
+                if test_name and len(test_name) >= 5 and test_name.isprintable():
+                    name_offset = test_offset
+                    break
+        
+        if name_offset is not None:
+            slot_name = get_string(data, slot_offset + name_offset, 24)
+            print(f"Name at +{name_offset}: '{slot_name}'")
+            
+            # Show hex dump around the name
+            hex_dump(data, slot_offset + name_offset, 48, "Name area")
+            
+            # Try to find patch reference data
+            # In STL1 it's at name+24, name+25, name+26
+            # Let's check the same in SLD1
+            patch_area_offset = slot_offset + name_offset + 24
+            print(f"\nBytes after name (+{name_offset+24} to +{name_offset+35}):")
+            for i in range(12):
+                byte_val = data[patch_area_offset + i]
+                print(f"  +{name_offset+24+i}: 0x{byte_val:02X} ({byte_val:3d})")
+        
+        print()
+
+if __name__ == '__main__':
+    import sys
+    
+    if len(sys.argv) > 1:
+        filename = sys.argv[1]
+    else:
+        filename = 'SETLIST Movie TV Themes LOAD SEPARATELY.PCG'
+    
+    analyze_sld1_slots(filename)

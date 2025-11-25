@@ -1,0 +1,54 @@
+HARDWARE TEST CHECKLIST - Writer Fix
+=====================================
+
+FILES ON USB DRIVE:
+✓ WRITER_FIX_TEST.PCG (11 MB)
+✓ DUAL_FORMAT_TEST.PCG (11 MB)
+
+QUICK TEST PROCEDURE:
+---------------------
+
+1. INSERT USB into Kronos
+
+2. LOAD FILE:
+   - Press DISK button
+   - Navigate to USB
+   - Select "WRITER_FIX_TEST.PCG"
+   - Press LOAD
+
+3. CHECK RESULTS:
+   [ ] File loads without error?
+   [ ] First setlist name shows "WRITER FIX TEST"?
+   [ ] Slots are accessible?
+   [ ] Patches play correctly?
+   [ ] Second setlist still shows "NIGHTWISH LEGACY 2"?
+
+4. REPEAT with DUAL_FORMAT_TEST.PCG:
+   [ ] File loads without error?
+   [ ] First setlist name shows "DUAL FORMAT TEST"?
+
+EXPECTED RESULTS:
+-----------------
+✓ Both files load successfully
+✓ Setlist names display correctly
+✓ All slots work normally
+✓ No corruption in other setlists
+
+IF TESTS PASS:
+--------------
+→ Writer fix is CONFIRMED WORKING
+→ Can proceed with slot names, metadata, etc.
+
+IF TESTS FAIL:
+--------------
+→ Document exact error message
+→ Note what name is displayed (if any)
+→ Check Kronos OS version
+
+DOCUMENTATION:
+--------------
+See HARDWARE_TEST_INSTRUCTIONS.md for detailed procedure
+See WRITER_FIX_COMPLETE.md for technical details
+See SESSION_COMPLETE_NOV25.md for full session summary
+
+STATUS: Ready for testing

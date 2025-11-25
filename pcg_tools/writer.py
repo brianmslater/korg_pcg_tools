@@ -50,13 +50,113 @@ class PcgWriter:
                     if offset + len(combi.raw_data) <= len(raw_data):
                         raw_data[offset:offset+len(combi.raw_data)] = combi.raw_data
         
-        # Update setlist data (names only - patch data format not yet fully understood)
-        self._update_setlist_data(raw_data)
-        
-        # Update STL1/SBK1 data (color, text_size, and complete slot data)
-        self._update_stl1_data(raw_data)
+        # Update ALL chunks to keep them in sync
+        self._update_all_setlist_chunks(raw_data)
         
         self.pcg.raw_data = bytes(raw_data)
+    
+    def _update_all_setlist_chunks(self, raw_data: bytearray):
+        """Update setlist names in SLS1 chunk only.
+        
+        CRITICAL FINDING (Nov 25, 2025):
+        - SLS1 (new format) - Parser reads from here, MUST be updated
+        - SBK1 (old format) - MUST NOT be changed! Changing it breaks file validation
+        
+        Hardware testing proved:
+        - ✅ Kronos ACCEPTS files with mismatched SLS1/SBK1 names
+        - ❌ Kronos REJECTS files when we CHANGE the SBK1 name
+        - ✅ SLS1-only updates work perfectly
+        
+        The SBK1 chunk has hidden validation (checksum/CRC/references) that we
+        don't understand. Changing it breaks the file. Solution: only update SLS1.
+        """
+        if not self.pcg.set_lists:
+            return
+        
+        # Update ONLY SLS1 (new format - what parser reads and displays)
+        self._update_sls1_names(raw_data)
+        
+        # DO NOT update SBK1! Changing it breaks file validation.
+        # The original file has mismatched names and works fine.
+        # self._update_sbk1_names(raw_data)  # DISABLED - breaks files!
+    
+    def _update_sls1_names(self, raw_data: bytearray):
+        """Update setlist names in SLS1 chunk (new format).
+        
+        Structure: marker (1e020000) + name (24 bytes) + separator (280f0100)
+        Spacing: ~3612 bytes between setlists
+        
+        This is the format the parser reads from, so it MUST be updated!
+        """
+        sls1_offset = raw_data.find(b'SLS1')
+        if sls1_offset < 0:
+            return
+        
+        # Find setlist positions by looking for the marker pattern
+        marker = b'\x1e\x02\x00\x00'
+        separator = b'\x28\x0f\x01\x00'
+        
+        sls1_data_start = sls1_offset + 8
+        sls1_size = struct.unpack('<I', raw_data[sls1_offset+4:sls1_offset+8])[0]
+        sls1_end = sls1_data_start + sls1_size
+        
+        # Find all setlist name positions
+        positions = []
+        pos = sls1_data_start
+        while pos < sls1_end:
+            # Look for marker
+            pos = raw_data.find(marker, pos, sls1_end)
+            if pos == -1:
+                break
+            
+            # Check if separator follows after 24 bytes
+            name_start = pos + 4
+            sep_pos = name_start + 24
+            if sep_pos + 4 <= sls1_end:
+                if raw_data[sep_pos:sep_pos+4] == separator:
+                    positions.append(name_start)
+            
+            pos += 1
+        
+        # Update names for setlists we have
+        for sl_idx, setlist in enumerate(self.pcg.set_lists):
+            if sl_idx >= len(positions):
+                break
+            
+            name_pos = positions[sl_idx]
+            name_bytes = setlist.name.encode('ascii', errors='ignore')[:24]
+            name_bytes = name_bytes.ljust(24, b'\x00')
+            raw_data[name_pos:name_pos+24] = name_bytes
+    
+    def _update_sbk1_names(self, raw_data: bytearray):
+        """Update setlist names in SBK1 chunk (old format).
+        
+        Structure: name (24 bytes) directly, no markers
+        Spacing: 69,416 bytes between setlists
+        First setlist at: SBK1_data + 69,432
+        """
+        sbk1_offset = raw_data.find(b'SBK1')
+        if sbk1_offset < 0:
+            return
+        
+        sbk1_data_start = sbk1_offset + 8
+        
+        SETLIST_SPACING = 69416
+        FIRST_SETLIST_OFFSET = 69432
+        
+        # Update each setlist
+        for sl_idx, setlist in enumerate(self.pcg.set_lists):
+            if sl_idx == 0:
+                name_pos = sbk1_data_start + FIRST_SETLIST_OFFSET
+            else:
+                name_pos = sbk1_data_start + FIRST_SETLIST_OFFSET + (sl_idx * SETLIST_SPACING)
+            
+            if name_pos + 24 > len(raw_data):
+                break
+            
+            name_bytes = setlist.name.encode('ascii', errors='ignore')[:24]
+            name_bytes = name_bytes.ljust(24, b'\x00')
+            raw_data[name_pos:name_pos+24] = name_bytes
     
     def _update_setlist_data(self, raw_data: bytearray):
         """Update setlist and slot data in the SLS1 chunk.
@@ -67,6 +167,9 @@ class PcgWriter:
         - Separator: 0x28 0x0F 0x01 0x00
         - First slot name (24 bytes, no marker)
         - Remaining 127 slots with marker + name (28 bytes each)
+        
+        IMPORTANT: Only updates setlists that exist in self.pcg.set_lists.
+        Does NOT touch empty setlist positions to avoid corruption.
         """
         if not self.pcg.set_lists:
             return
@@ -80,11 +183,11 @@ class PcgWriter:
         sls1_size = struct.unpack('<I', raw_data[sls1_offset+4:sls1_offset+8])[0]
         sls1_end = sls1_offset + 8 + sls1_size
         
-        # Find all setlists by looking for separators
+        # Find all setlist positions by looking for separators
         separator = b'\x28\x0F\x01\x00'
         marker = b'\x1E\x02\x00\x00'
         
-        setlist_offsets = []
+        all_setlist_offsets = []
         pos = sls1_offset + 8
         while pos < sls1_end:
             pos = raw_data.find(separator, pos)
@@ -97,22 +200,21 @@ class PcgWriter:
             if marker_offset >= sls1_offset:
                 check_marker = raw_data[marker_offset:marker_offset+4]
                 if check_marker == marker:
-                    setlist_offsets.append(marker_offset)
+                    all_setlist_offsets.append(marker_offset)
             
             pos += 4
         
-        if len(setlist_offsets) == 0:
+        if len(all_setlist_offsets) == 0:
             return
         
-        # Limit to 16 setlists
-        setlist_offsets = setlist_offsets[:16]
+        # CRITICAL FIX: Only update the first N positions where N = number of actual setlists
+        # This prevents corrupting empty setlist positions with data from setlist 0
+        num_setlists_to_update = min(len(self.pcg.set_lists), len(all_setlist_offsets))
         
-        # Update each setlist
-        for sl_idx, setlist_start in enumerate(setlist_offsets):
-            if sl_idx >= len(self.pcg.set_lists):
-                break
-            
+        # Update only the setlists we have data for
+        for sl_idx in range(num_setlists_to_update):
             setlist = self.pcg.set_lists[sl_idx]
+            setlist_start = all_setlist_offsets[sl_idx]
             
             # Update setlist name (skip marker, write 24 bytes)
             name_offset = setlist_start + 4
@@ -120,51 +222,56 @@ class PcgWriter:
             name_bytes = name_bytes.ljust(24, b'\x00')
             raw_data[name_offset:name_offset+24] = name_bytes
             
-            # Update slots
-            # After name + separator, slots begin
-            slots_start = name_offset + 24 + 4  # name + separator
+            # TODO: Update slots
+            # Slot writing is currently disabled because it's corrupting data
+            # Need to investigate why slot data from setlist 0 is being written to all positions
+            pass
             
-            # Create a map of slot_index -> slot for quick lookup
-            slot_map = {slot.slot_index: slot for slot in setlist.slots}
-            
-            # Update first slot (no marker)
-            if 0 in slot_map:
-                slot = slot_map[0]
-                name_bytes = slot.name.encode('ascii', errors='ignore')[:24]
-                name_bytes = name_bytes.ljust(24, b'\x00')
-                raw_data[slots_start:slots_start+24] = name_bytes
-            
-            # Update remaining slots (with markers)
-            current_pos = slots_start + 24
-            for slot_idx in range(1, 128):
-                # Check if marker exists
-                if current_pos + 28 > len(raw_data):
-                    break
-                
-                check_marker = raw_data[current_pos:current_pos+4]
-                if check_marker != marker:
-                    break
-                
-                # Update slot name if it exists in our data
-                if slot_idx in slot_map:
-                    slot = slot_map[slot_idx]
-                    name_bytes = slot.name.encode('ascii', errors='ignore')[:24]
-                    name_bytes = name_bytes.ljust(24, b'\x00')
-                    raw_data[current_pos+4:current_pos+28] = name_bytes
-                
-                current_pos += 28
+            # # Update slots
+            # # After name + separator, slots begin
+            # slots_start = name_offset + 24 + 4  # name + separator
+            #
+            # # Create a map of slot_index -> slot for quick lookup
+            # slot_map = {slot.slot_index: slot for slot in setlist.slots}
+            #
+            # # Update first slot (no marker)
+            # if 0 in slot_map:
+            #     slot = slot_map[0]
+            #     name_bytes = slot.name.encode('ascii', errors='ignore')[:24]
+            #     name_bytes = name_bytes.ljust(24, b'\x00')
+            #     raw_data[slots_start:slots_start+24] = name_bytes
+            #
+            # # Update remaining slots (with markers)
+            # current_pos = slots_start + 24
+            # for slot_idx in range(1, 128):
+            #     # Check if marker exists
+            #     if current_pos + 28 > len(raw_data):
+            #         break
+            #
+            #     check_marker = raw_data[current_pos:current_pos+4]
+            #     if check_marker != marker:
+            #         break
+            #
+            #     # Update slot name if it exists in our data
+            #     if slot_idx in slot_map:
+            #         slot = slot_map[slot_idx]
+            #         name_bytes = slot.name.encode('ascii', errors='ignore')[:24]
+            #         name_bytes = name_bytes.ljust(24, b'\x00')
+            #         raw_data[current_pos+4:current_pos+28] = name_bytes
+            #
+            #     current_pos += 28
     
     def _update_stl1_data(self, raw_data: bytearray):
-        """Update STL1/SBK1 chunk with color and text_size metadata.
+        """Update STL1/SBK1 chunk with setlist data.
         
-        STL1/SBK1 structure:
-        - SBK1 data start + 16: Setlist name (24 bytes)
-        - SBK1 data start + 40: First slot
-        - Each slot: ~542 bytes
-          - +0: Slot name (24 bytes)
-          - +24: Color (1 byte)
-          - +29: Text size (1 byte)
-          - Rest: Notes/description
+        SBK1 structure (discovered through analysis):
+        - Each setlist is 69,416 bytes
+        - Setlist N starts at: SBK1_data_start + (N * 69416) + 69432
+        - Within each setlist:
+          - Offset +0: Setlist name (24 bytes) - but actually at -16 from first occurrence
+          - Slots follow after
+        
+        This is the chunk the Kronos actually reads for display!
         """
         if not self.pcg.set_lists:
             return
@@ -172,7 +279,6 @@ class PcgWriter:
         # Find STL1 chunk
         stl1_offset = raw_data.find(b'STL1')
         if stl1_offset < 0:
-            # No STL1 chunk - file may not have full setlist data
             return
         
         # Find SBK1 within STL1
@@ -183,44 +289,31 @@ class PcgWriter:
         # SBK1 data starts at +8
         sbk1_data_start = sbk1_offset + 8
         
-        # Update setlist name at +16
-        if len(self.pcg.set_lists) > 0:
-            setlist = self.pcg.set_lists[0]  # Currently only handling first setlist
-            setlist_name_offset = sbk1_data_start + 16
+        # Constants from analysis
+        SETLIST_SPACING = 69416  # Bytes between setlists
+        FIRST_SETLIST_OFFSET = 69432  # Offset to first setlist name
+        NAME_OFFSET_FROM_FOUND = -16  # Setlist name is 16 bytes before where we find it
+        
+        # Update each setlist we have data for
+        for sl_idx, setlist in enumerate(self.pcg.set_lists):
+            # Calculate where this setlist's name should be
+            # First setlist is at +69432, then every 69416 bytes
+            if sl_idx == 0:
+                name_pos = sbk1_data_start + FIRST_SETLIST_OFFSET
+            else:
+                name_pos = sbk1_data_start + FIRST_SETLIST_OFFSET + (sl_idx * SETLIST_SPACING)
+            
+            # Verify we're in bounds
+            if name_pos + 24 > len(raw_data):
+                break
+            
+            # Update setlist name
             name_bytes = setlist.name.encode('ascii', errors='ignore')[:24]
             name_bytes = name_bytes.ljust(24, b'\x00')
-            raw_data[setlist_name_offset:setlist_name_offset+24] = name_bytes
+            raw_data[name_pos:name_pos+24] = name_bytes
             
-            # Update slots starting at +40
-            current_offset = sbk1_data_start + 40
-            APPROX_SLOT_SIZE = 542
-            
-            # Create slot map for quick lookup
-            slot_map = {slot.slot_index: slot for slot in setlist.slots}
-            
-            # Update each slot
-            for slot_idx in range(128):
-                if current_offset + 100 > len(raw_data):
-                    break
-                
-                if slot_idx in slot_map:
-                    slot = slot_map[slot_idx]
-                    
-                    # Update slot name (24 bytes)
-                    name_bytes = slot.name.encode('ascii', errors='ignore')[:24]
-                    name_bytes = name_bytes.ljust(24, b'\x00')
-                    raw_data[current_offset:current_offset+24] = name_bytes
-                    
-                    # Update color at +24
-                    if current_offset + 24 < len(raw_data):
-                        raw_data[current_offset + 24] = slot.color & 0xFF
-                    
-                    # Update text_size at +29
-                    if current_offset + 29 < len(raw_data):
-                        raw_data[current_offset + 29] = slot.text_size & 0xFF
-                
-                # Move to next slot
-                current_offset += APPROX_SLOT_SIZE
+            # TODO: Update slot names and metadata
+            # For now, just updating setlist names to avoid corruption
     
     def _encode_bank_id(self, bank_id: str) -> int:
         """Encode bank ID string to byte value.

@@ -1,101 +1,76 @@
 #!/usr/bin/env python3
-"""
-Analyze the SDB1 chunk structure in detail.
-Looking for color/size metadata arrays.
-"""
+"""Analyze SDB1 chunk structure to find setlist color data."""
 
-import struct
+def get_string(data, offset, length):
+    """Read null-terminated ASCII string."""
+    string_data = data[offset:offset+length]
+    null_pos = string_data.find(b'\x00')
+    if null_pos >= 0:
+        string_data = string_data[:null_pos]
+    return string_data.decode('ascii', errors='ignore').strip()
 
 def analyze_sdb1(filename):
+    """Analyze SDB1 structure."""
     with open(filename, 'rb') as f:
         data = f.read()
     
-    print(f"Analyzing: {filename}\n")
-    
     # Find SDB1
     sdb1_pos = data.find(b'SDB1')
-    sdb1_size = struct.unpack('>I', data[sdb1_pos+4:sdb1_pos+8])[0]
+    if sdb1_pos < 0:
+        print("SDB1 not found")
+        return
     
-    print(f"SDB1 at: 0x{sdb1_pos:08X}")
-    print(f"SDB1 size: {sdb1_size:,} bytes\n")
+    sdb1_size = int.from_bytes(data[sdb1_pos+4:sdb1_pos+8], 'little')
+    print(f"SDB1 at 0x{sdb1_pos:08X}, size: {sdb1_size:,} bytes\n")
     
-    # Show first 512 bytes of SDB1 data
-    print("First 512 bytes of SDB1 data:")
-    print("="*80)
-    for i in range(0, 512, 16):
-        offset = sdb1_pos + 8 + i
-        hex_str = ' '.join(f'{b:02X}' for b in data[offset:offset+16])
-        ascii_str = ''.join(chr(b) if 32 <= b < 127 else '.' for b in data[offset:offset+16])
-        print(f"  +{i:4d} (0x{offset:08X}): {hex_str:<48} {ascii_str}")
+    # Expected colors for SC 10/4 (setlist index 4):
+    # Slot 0: Navy (164/165)
+    # Slot 1: Indigo (160)
+    # Slots 2,3,4: Gold (152/153)
     
-    # The setlist name starts at +16
-    setlist_name_offset = sdb1_pos + 8 + 16
-    setlist_name = data[setlist_name_offset:setlist_name_offset+24].rstrip(b'\x00').decode('ascii', errors='replace')
-    print(f"\nSetlist name at +16: '{setlist_name}'")
+    print("Searching for SC 10/4 color pattern...")
+    print("Expected: Navy(164/165), Indigo(160), Gold(152/153), Gold, Gold")
+    print()
     
-    # Check the first 16 bytes - might be metadata
-    print("\nFirst 16 bytes of SDB1 (before setlist name):")
-    first_16 = data[sdb1_pos+8:sdb1_pos+24]
-    hex_str = ' '.join(f'{b:02X}' for b in first_16)
-    print(f"  {hex_str}")
-    print(f"  As integers: {list(first_16)}")
+    # Search for sequences that might be the color data
+    # Try to find: 164/165 followed by 160 within a reasonable distance
+    sdb1_end = sdb1_pos + 8 + sdb1_size
     
-    # Parse as potential structure
-    print("\nParsing first 16 bytes:")
-    print(f"  Bytes 0-3:   {struct.unpack('>I', first_16[0:4])[0]:10d} (0x{struct.unpack('>I', first_16[0:4])[0]:08X})")
-    print(f"  Bytes 4-7:   {struct.unpack('>I', first_16[4:8])[0]:10d} (0x{struct.unpack('>I', first_16[4:8])[0]:08X})")
-    print(f"  Bytes 8-11:  {struct.unpack('>I', first_16[8:12])[0]:10d} (0x{struct.unpack('>I', first_16[8:12])[0]:08X})")
-    print(f"  Bytes 12-15: {struct.unpack('>I', first_16[12:16])[0]:10d} (0x{struct.unpack('>I', first_16[12:16])[0]:08X})")
-    
-    # 0x0E1C = 3612 bytes - size of ONE setlist's slot names
-    # With 16 setlists, that's 16 × 3612 = 57,792 bytes (0xE1C0)
-    # Metadata should be AFTER all 16 setlists
-    
-    one_setlist_size = 0x0E1C
-    all_setlists_size = 16 * one_setlist_size
-    
-    print(f"\nOne setlist size: {one_setlist_size} bytes (0x{one_setlist_size:04X})")
-    print(f"All 16 setlists: {all_setlists_size} bytes (0x{all_setlists_size:04X})")
-    
-    potential_metadata_offset = sdb1_pos + 8 + all_setlists_size
-    print(f"\nChecking after all 16 setlists:")
-    print(f"  Absolute position: 0x{potential_metadata_offset:08X}")
-    print(f"  First 256 bytes at this location:")
-    
-    for i in range(0, 256, 16):
-        offset = potential_metadata_offset + i
-        hex_str = ' '.join(f'{b:02X}' for b in data[offset:offset+16])
-        ascii_str = ''.join(chr(b) if 32 <= b < 127 else '.' for b in data[offset:offset+16])
-        
-        # Check if this looks like metadata (small values)
-        vals = [b for b in data[offset:offset+16]]
-        small_count = sum(1 for v in vals if 0 <= v <= 15)
-        marker = f" <-- {small_count}/16 small" if small_count >= 12 else ""
-        
-        print(f"  +{i:4d}: {hex_str:<48} {ascii_str}{marker}")
-    
-    # Check specific slot positions in this potential metadata array
-    print("\n" + "="*80)
-    print("CHECKING POTENTIAL COLOR ARRAY")
-    print("="*80)
-    print(f"\nIf this is a color array at 0x{potential_metadata_offset:08X}:")
-    print(f"  Slot 0 (Burgundy): {data[potential_metadata_offset + 0]:3d} (0x{data[potential_metadata_offset + 0]:02X})")
-    print(f"  Slot 1 (Olive):    {data[potential_metadata_offset + 1]:3d} (0x{data[potential_metadata_offset + 1]:02X})")
-    print(f"  Slot 3 (Navy):     {data[potential_metadata_offset + 3]:3d} (0x{data[potential_metadata_offset + 3]:02X})")
-    print(f"  Slot 12 (Indigo):  {data[potential_metadata_offset + 12]:3d} (0x{data[potential_metadata_offset + 12]:02X})")
-    
-    test_vals = [
-        data[potential_metadata_offset + 0],
-        data[potential_metadata_offset + 1],
-        data[potential_metadata_offset + 3],
-        data[potential_metadata_offset + 12]
-    ]
-    
-    if len(set(test_vals)) > 1:
-        print("\n  *** DIFFERENT VALUES - This could be the color array! ***")
-        print(f"\n  Unique values: {sorted(set(test_vals))}")
-    else:
-        print("\n  All same values - not the color array")
+    for navy in [164, 165]:
+        for i in range(sdb1_pos, min(sdb1_end - 100, len(data))):
+            if data[i] == navy:
+                # Check next 20 bytes for indigo
+                for j in range(i+1, min(i+20, len(data))):
+                    if data[j] == 160:  # Indigo
+                        # Check next 20 bytes for gold
+                        for k in range(j+1, min(j+20, len(data))):
+                            if data[k] in [152, 153]:  # Gold
+                                # Check if next 2 bytes are also gold
+                                if k+2 < len(data):
+                                    if data[k+1] in [152, 153] and data[k+2] in [152, 153]:
+                                        print(f"Found potential match at 0x{i:08X}:")
+                                        print(f"  Navy at +0")
+                                        print(f"  Indigo at +{j-i}")
+                                        print(f"  Gold at +{k-i}, +{k-i+1}, +{k-i+2}")
+                                        
+                                        # Show context
+                                        print(f"\n  Context (32 bytes before to 32 after):")
+                                        start = max(sdb1_pos, i-32)
+                                        end = min(len(data), i+64)
+                                        for m in range(start, end, 16):
+                                            hex_str = ' '.join(f'{data[m+n]:02X}' for n in range(min(16, end-m)))
+                                            print(f"    {m:08X}: {hex_str}")
+                                        print()
+                                        
+                                        # Only show first few matches
+                                        return
 
 if __name__ == '__main__':
-    analyze_sdb1('test_files/SETLIST Movie TV Themes LOAD SEPARATELY.PCG')
+    import sys
+    
+    if len(sys.argv) > 1:
+        filename = sys.argv[1]
+    else:
+        filename = 'test_files/soundcheck9_25_25_combined2.PCG'
+    
+    analyze_sdb1(filename)
