@@ -793,14 +793,24 @@ class PcgMainWindow(QMainWindow):
             self.notes_text.blockSignals(True)
             self.notes_text.clear()
             self.notes_text.blockSignals(False)
+            self.font_size_combo.blockSignals(True)
+            self.font_size_combo.setCurrentText("M")
+            self.font_size_combo.blockSignals(False)
             return
         
         row = selected_rows[0].row()
         if row < len(setlist.slots):
             slot = setlist.slots[row]
+            
+            # Update notes text
             self.notes_text.blockSignals(True)
             self.notes_text.setPlainText(slot.notes if slot.notes else "")
             self.notes_text.blockSignals(False)
+            
+            # Update font size combo to match slot's text_size
+            self.font_size_combo.blockSignals(True)
+            self.font_size_combo.setCurrentText(slot.text_size_name)
+            self.font_size_combo.blockSignals(False)
     
     def on_notes_changed(self):
         """Handle notes text change."""
@@ -822,20 +832,39 @@ class PcgMainWindow(QMainWindow):
             self.mark_dirty()
     
     def on_font_size_changed(self, size_text):
-        """Handle font size change for comments."""
-        # Map size labels to point sizes
-        size_map = {
-            "XS": 8,
-            "S": 10,
-            "M": 12,
-            "L": 14,
-            "XL": 16
-        }
+        """Handle font size change for slot text size."""
+        if not self.pcg:
+            return
         
-        point_size = size_map.get(size_text, 12)
-        font = self.notes_text.font()
-        font.setPointSize(point_size)
-        self.notes_text.setFont(font)
+        setlist = self.setlist_combo.currentData()
+        if not setlist:
+            return
+        
+        selected_rows = self.slots_table.selectionModel().selectedRows()
+        if not selected_rows:
+            return
+        
+        row = selected_rows[0].row()
+        if row < len(setlist.slots):
+            slot = setlist.slots[row]
+            
+            # Map size labels to SlotTextSize enum
+            from .models import SlotTextSize
+            size_map = {
+                "S": SlotTextSize.S,
+                "XS": SlotTextSize.XS,
+                "M": SlotTextSize.M,
+                "L": SlotTextSize.L,
+                "XL": SlotTextSize.XL
+            }
+            
+            if size_text in size_map:
+                slot.text_size = size_map[size_text]
+                self.mark_dirty()
+                
+                # Update the table display
+                if self.slots_table.item(row, 6):
+                    self.slots_table.item(row, 6).setText(size_text)
     
     def mark_dirty(self):
         """Mark file as modified."""
