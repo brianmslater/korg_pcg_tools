@@ -353,3 +353,113 @@ class PatchOperations:
     def _is_empty_combi(self, combi: Combi) -> bool:
         """Check if a combi is empty/init."""
         return "init" in combi.name.lower() or "empty" in combi.name.lower() or not combi.name.strip()
+
+
+def clear_setlist_slot(slot) -> None:
+    """Clear a setlist slot to default state.
+    
+    Resets all fields to their default values:
+    - Name: "Init Slot"
+    - Patch type: Program
+    - Bank: I-A (0)
+    - Patch index: 0
+    - Transpose: 0
+    - Volume: 127
+    - Text size: M (Medium)
+    - Description: empty
+    
+    Args:
+        slot: SetListSlot to clear
+    """
+    from .models import SlotTextSize
+    
+    # Clear name (24 bytes)
+    if slot.raw_data and len(slot.raw_data) >= 24:
+        slot.raw_data[0:24] = b'\x00' * 24
+    slot.name = "Init Slot"
+    
+    # Set to Program type (0)
+    slot.patch_type_value = 0
+    slot.patch_type = "Program"
+    
+    # Set to bank I-A (0)
+    slot.patch_bank_id = 0
+    slot.patch_bank = "I-A"
+    
+    # Set to patch 0
+    slot.patch_index_value = 0
+    slot.patch_index = 0
+    
+    # Reset volume to 127
+    slot.volume = 127
+    if slot.raw_data and len(slot.raw_data) >= 29:
+        slot.raw_data[28] = 0x7F
+    
+    # Reset transpose to 0
+    slot.transpose = 0
+    
+    # Reset text size to M (Medium)
+    slot.text_size = SlotTextSize.M
+    
+    # Clear description (512 bytes)
+    slot.description = ""
+    
+    # Reset color to default (0)
+    slot.color = 0
+
+
+def swap_setlist_slots(slot1, slot2) -> None:
+    """Swap two setlist slots completely.
+    
+    Exchanges all data between two slots including:
+    - Raw data
+    - All properties
+    
+    Args:
+        slot1: First SetListSlot
+        slot2: Second SetListSlot
+    """
+    if not slot1.raw_data or not slot2.raw_data:
+        return
+    
+    # Swap raw data
+    slot1.raw_data, slot2.raw_data = slot2.raw_data, slot1.raw_data
+    
+    # Swap indices
+    slot1.slot_index, slot2.slot_index = slot2.slot_index, slot1.slot_index
+
+
+def batch_set_volume(slots: List, volume: int) -> None:
+    """Set volume for multiple slots.
+    
+    Args:
+        slots: List of SetListSlot objects
+        volume: Volume value (0-127)
+    """
+    volume = max(0, min(127, volume))
+    for slot in slots:
+        slot.volume = volume
+        if slot.raw_data and len(slot.raw_data) >= 29:
+            slot.raw_data[28] = volume
+
+
+def batch_set_transpose(slots: List, transpose: int) -> None:
+    """Set transpose for multiple slots.
+    
+    Args:
+        slots: List of SetListSlot objects
+        transpose: Transpose value (-24 to +24)
+    """
+    for slot in slots:
+        slot.transpose = transpose
+
+
+def batch_set_text_size(slots: List, text_size) -> None:
+    """Set text size for multiple slots.
+    
+    Args:
+        slots: List of SetListSlot objects
+        text_size: SlotTextSize enum value
+    """
+    for slot in slots:
+        slot.text_size = text_size
