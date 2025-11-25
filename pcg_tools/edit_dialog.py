@@ -66,7 +66,8 @@ class EditSetListDialog:
         
         self.dialog = tk.Toplevel(parent)
         self.dialog.title("Edit Set List")
-        self.dialog.geometry("400x150")
+        self.dialog.geometry("450x180")
+        self.dialog.resizable(False, False)
         self.dialog.transient(parent)
         self.dialog.grab_set()
         
@@ -94,14 +95,18 @@ class EditSetListDialog:
         # Character count
         self.char_count_label = ttk.Label(main_frame, text=f"{len(self.setlist.name)}/24")
         self.char_count_label.grid(row=0, column=2, padx=5)
-        self.name_var.trace('w', self._update_char_count)
+        self.name_var.trace_add('write', self._update_char_count)
         
         # Buttons
         button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=1, column=0, columnspan=3, pady=20)
+        button_frame.grid(row=1, column=0, columnspan=3, pady=20, sticky=tk.EW)
         
-        ttk.Button(button_frame, text="OK", command=self._on_ok, width=10).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Cancel", command=self._on_cancel, width=10).pack(side=tk.LEFT, padx=5)
+        # Center the buttons
+        button_frame.columnconfigure(0, weight=1)
+        button_frame.columnconfigure(3, weight=1)
+        
+        ttk.Button(button_frame, text="OK", command=self._on_ok, width=12).grid(row=0, column=1, padx=5)
+        ttk.Button(button_frame, text="Cancel", command=self._on_cancel, width=12).grid(row=0, column=2, padx=5)
         
         # Configure grid
         main_frame.columnconfigure(1, weight=1)
@@ -157,7 +162,8 @@ class EditPatchDialog:
         
         self.dialog = tk.Toplevel(parent)
         self.dialog.title(f"Edit {patch_type.capitalize()}")
-        self.dialog.geometry("400x250")
+        self.dialog.geometry("450x300")
+        self.dialog.resizable(False, False)
         self.dialog.transient(parent)
         self.dialog.grab_set()
         
@@ -185,7 +191,7 @@ class EditPatchDialog:
         # Character count
         self.char_count_label = ttk.Label(main_frame, text=f"{len(self.patch.name)}/24")
         self.char_count_label.grid(row=0, column=2, padx=5)
-        self.name_var.trace('w', self._update_char_count)
+        self.name_var.trace_add('write', self._update_char_count)
         
         # Category
         ttk.Label(main_frame, text="Category:").grid(row=1, column=0, sticky=tk.W, pady=5)
@@ -211,10 +217,14 @@ class EditPatchDialog:
         
         # Buttons
         button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=4, column=0, columnspan=3, pady=20)
+        button_frame.grid(row=4, column=0, columnspan=3, pady=20, sticky=tk.EW)
         
-        ttk.Button(button_frame, text="OK", command=self._on_ok, width=10).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Cancel", command=self._on_cancel, width=10).pack(side=tk.LEFT, padx=5)
+        # Center the buttons
+        button_frame.columnconfigure(0, weight=1)
+        button_frame.columnconfigure(3, weight=1)
+        
+        ttk.Button(button_frame, text="OK", command=self._on_ok, width=12).grid(row=0, column=1, padx=5)
+        ttk.Button(button_frame, text="Cancel", command=self._on_cancel, width=12).grid(row=0, column=2, padx=5)
         
         # Configure grid
         main_frame.columnconfigure(1, weight=1)

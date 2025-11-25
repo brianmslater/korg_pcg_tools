@@ -21,6 +21,31 @@ class WorkstationModel(Enum):
     TRINITY = "Korg Trinity"
 
 
+class SlotTextSize(Enum):
+    """Setlist slot text size options."""
+    XS = 0  # Extra Small (placeholder - actual value TBD)
+    S = 0   # Small (placeholder - actual value TBD)
+    M = 0   # Medium (confirmed)
+    L = 0   # Large (placeholder - actual value TBD)
+    XL = 16 # Extra Large (confirmed)
+
+
+# Slot color mapping (partial - confirmed values only)
+# TODO: Complete this mapping with test files
+SLOT_COLORS = {
+    32: "Indigo",
+    140: "Burgundy",
+    # Add more as we discover them
+}
+
+# Reverse mapping for writing
+SLOT_COLOR_VALUES = {
+    "Indigo": 32,
+    "Burgundy": 140,
+    # Add more as we discover them
+}
+
+
 @dataclass
 class PcgHeader:
     """PCG file header information."""
@@ -107,6 +132,8 @@ class SetListSlot:
     transpose: int = 0
     volume: int = 127
     hold: bool = False
+    color: int = 0  # Color value (byte from STL1/SBK1 at +24)
+    text_size: int = 0  # Text size value (byte from STL1/SBK1 at +29)
     
     @property
     def id(self) -> str:
@@ -119,6 +146,21 @@ class SetListSlot:
         if self.patch_bank and self.patch_type:
             return f"{self.patch_bank}{self.patch_index:03d}"
         return "None"
+    
+    @property
+    def color_name(self) -> str:
+        """Return human-readable color name."""
+        return SLOT_COLORS.get(self.color, f"Unknown({self.color})")
+    
+    @property
+    def text_size_name(self) -> str:
+        """Return human-readable text size name."""
+        if self.text_size == 0:
+            return "M"
+        elif self.text_size == 16:
+            return "XL"
+        else:
+            return f"Unknown({self.text_size})"
 
 
 @dataclass

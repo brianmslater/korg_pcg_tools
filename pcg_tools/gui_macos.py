@@ -98,7 +98,12 @@ class PcgWindow:
         
         # Setlists view
         self.setlists_frame = ttk.Frame(self.content_frame)
-        self._create_setlist_view(self.setlists_frame)
+        try:
+            self._create_setlist_view(self.setlists_frame)
+        except Exception as e:
+            print(f"Error creating setlist view: {e}")
+            import traceback
+            traceback.print_exc()
         
         # Show programs by default
         self.programs_frame.pack(fill=tk.BOTH, expand=True)
@@ -190,6 +195,9 @@ class PcgWindow:
         # Edit setlist name button
         ttk.Button(selector_frame, text="Edit Name", command=self._edit_setlist_name, width=12).pack(side=tk.LEFT, padx=5)
         
+        # New setlist button
+        ttk.Button(selector_frame, text="New Setlist", command=self._create_new_setlist, width=12).pack(side=tk.LEFT, padx=5)
+        
         # Middle: Slots list
         slots_frame = ttk.Frame(parent)
         slots_frame.pack(fill=tk.BOTH, expand=True, pady=5)
@@ -247,20 +255,33 @@ class PcgWindow:
     
     def _switch_view(self):
         """Switch between views."""
+        # Write to file for debugging
+        with open('/tmp/pcg_debug.log', 'a') as f:
+            f.write(f"_switch_view called\n")
+        
         self.programs_frame.pack_forget()
         self.combis_frame.pack_forget()
         self.setlists_frame.pack_forget()
         
         view = self.view_var.get()
+        with open('/tmp/pcg_debug.log', 'a') as f:
+            f.write(f"Switching to view: {view}\n")
+        
         if view == "programs":
             self.programs_frame.pack(fill=tk.BOTH, expand=True)
         elif view == "combis":
             self.combis_frame.pack(fill=tk.BOTH, expand=True)
         else:  # setlists
+            with open('/tmp/pcg_debug.log', 'a') as f:
+                f.write(f"Packing setlists frame\n")
             self.setlists_frame.pack(fill=tk.BOTH, expand=True)
             self._load_setlists()
         
         self._update_counts()
+        
+        # Force GUI update on macOS
+        self.window.update_idletasks()
+        self.window.update()
     
     def load_file(self, filepath):
         """Load a PCG file."""
@@ -270,6 +291,9 @@ class PcgWindow:
             self.operations = PatchOperations(self.pcg)
             self._update_display()
             self.window.title(f"PCG Tools - {Path(filepath).name}")
+            # Force GUI update on macOS
+            self.window.update_idletasks()
+            self.window.update()
         except Exception as e:
             messagebox.showerror("Error", f"Failed to open file:\n{e}", parent=self.window)
     
@@ -322,11 +346,23 @@ class PcgWindow:
     
     def _load_setlists(self):
         """Load setlists into combo box."""
-        if not self.pcg or not self.pcg.set_lists:
+        print(f"DEBUG: _load_setlists called, pcg={self.pcg is not None}")
+        if not self.pcg:
+            print(f"DEBUG: No PCG loaded")
             self.setlist_combo['values'] = []
             return
         
+        print(f"DEBUG: PCG has {len(self.pcg.set_lists) if self.pcg.set_lists else 0} setlists")
+        if not self.pcg.set_lists:
+            print(f"DEBUG: No setlists, showing message")
+            self.setlist_combo['values'] = ["(No setlists - click 'New Setlist' to create)"]
+            self.setlist_combo.current(0)
+            self.setlist_listbox.delete(0, tk.END)
+            self.notes_text.delete('1.0', tk.END)
+            return
+        
         setlist_names = [f"{sl.index}: {sl.name}" for sl in self.pcg.set_lists]
+        print(f"DEBUG: Setlist names: {setlist_names}")
         self.setlist_combo['values'] = setlist_names
         if setlist_names:
             self.setlist_combo.current(0)
@@ -352,16 +388,54 @@ class PcgWindow:
         self.setlist_listbox.delete(0, tk.END)
         self.setlist_data = []
         
-        for slot in setlist.slots:
-            # Format: Slot# Name Patch Trans Vol
-            trans_str = f"{slot.transpose:+3d}" if slot.transpose != 0 else "  0"
-            line = f"{slot.slot_index:3d}  {slot.name:<24} {slot.patch_id:<10} {trans_str} {slot.volume:3d}"
-            self.setlist_listbox.insert(tk.END, line)
-            self.setlist_data.append(slot)
+        # Create a map of slot_index -> slot for quick lookup
+        slot_map = {slot.slot_index: slot for slot in setlist.slots}
+        
+        # Display all 128 slots like the Kronos does
+        for slot_idx in range(128):
+            if slot_idx in slot_map:
+                slot = slot_map[slot_idx]
+                
+                # Get the actual patch/combi name (like Kronos displays)
+                patch_name = self._get_patch_name(slot)
+                
+                # Format like Kronos: "0  STARGAZERS STRINGS INTRO  CMB I-A 057  +0  127"
+                trans_str = f"{slot.transpose:+3d}" if slot.transpose != 0 else "  0"
+                patch_type_short = "CMB" if slot.patch_type == "Combi" else "PRG"
+                line = f"{slot_idx:3d}  {patch_name:<30} {patch_type_short} {slot.patch_bank}-{slot.patch_index:03d}  {trans_str} {slot.volume:3d}"
+                self.setlist_listbox.insert(tk.END, line)
+                self.setlist_data.append(slot)
+            else:
+                # Empty slot
+                line = f"{slot_idx:3d}  (empty)"
+                self.setlist_listbox.insert(tk.END, line)
+                self.setlist_data.append(None)
         
         # Clear notes
         self.notes_text.delete('1.0', tk.END)
         self.notes_dirty = False
+    
+    def _get_patch_name(self, slot):
+        """Get the actual patch/combi name for a slot (like Kronos displays)."""
+        if not self.pcg:
+            return slot.name
+        
+        # Try to find the referenced patch
+        if slot.patch_type == "Combi":
+            for bank in self.pcg.combi_banks:
+                if bank.bank_id == slot.patch_bank:
+                    if slot.patch_index < len(bank.patches):
+                        return bank.patches[slot.patch_index].name
+                    break
+        elif slot.patch_type == "Program":
+            for bank in self.pcg.program_banks:
+                if bank.bank_id == slot.patch_bank:
+                    if slot.patch_index < len(bank.patches):
+                        return bank.patches[slot.patch_index].name
+                    break
+        
+        # Fallback to slot name if patch not found
+        return slot.name if slot.name else "(unknown)"
     
     def _load_slot_notes(self):
         """Load notes for selected slot."""
@@ -383,7 +457,8 @@ class PcgWindow:
         if 0 <= index < len(self.setlist_data):
             slot = self.setlist_data[index]
             self.notes_text.delete('1.0', tk.END)
-            self.notes_text.insert('1.0', slot.notes)
+            if slot:  # Not an empty slot
+                self.notes_text.insert('1.0', slot.notes)
             self.notes_dirty = False
     
     def _mark_notes_dirty(self):
@@ -399,12 +474,60 @@ class PcgWindow:
         index = selection[0]
         if 0 <= index < len(self.setlist_data):
             slot = self.setlist_data[index]
-            notes = self.notes_text.get('1.0', tk.END).strip()
-            slot.notes = notes
-            self.notes_dirty = False
-            self.is_dirty = True
-            self._update_title()
-            messagebox.showinfo("Saved", "Notes saved successfully", parent=self.window)
+            if slot:  # Not an empty slot
+                notes = self.notes_text.get('1.0', tk.END).strip()
+                slot.notes = notes
+                self.notes_dirty = False
+                self.is_dirty = True
+                self._update_title()
+                messagebox.showinfo("Saved", "Notes saved successfully", parent=self.window)
+            else:
+                messagebox.showwarning("Empty Slot", "Cannot save notes for an empty slot", parent=self.window)
+    
+    def _create_new_setlist(self):
+        """Create a new setlist."""
+        if not self.pcg:
+            return
+        
+        from .models import SetList
+        
+        # Determine next index
+        next_index = len(self.pcg.set_lists)
+        if next_index >= 16:
+            messagebox.showwarning(
+                "Maximum Setlists",
+                "Maximum of 16 setlists reached. Cannot create more.",
+                parent=self.window
+            )
+            return
+        
+        # Create new setlist
+        new_setlist = SetList(
+            index=next_index,
+            name=f"Set List {next_index + 1}",
+            description="",
+            color=0,
+            slots=[]
+        )
+        
+        # Add to PCG
+        self.pcg.set_lists.append(new_setlist)
+        self.pcg.has_set_lists = True
+        
+        # Mark as dirty
+        self.is_dirty = True
+        self._update_title()
+        
+        # Reload and select new setlist
+        self._load_setlists()
+        self.setlist_combo.current(next_index)
+        self._load_setlist_slots()
+        
+        # Show confirmation
+        self.parent.status_bar.config(
+            text=f"✓ New setlist '{new_setlist.name}' created - Press Cmd+S to save to file",
+            foreground='blue'
+        )
     
     def _edit_setlist_name(self):
         """Edit the name of the currently selected setlist."""
@@ -688,6 +811,10 @@ class PcgToolsGUI:
         
         self._create_menu()
         self._create_widgets()
+        
+        # Force initial rendering on macOS
+        self.root.update_idletasks()
+        self.root.update()
     
     def _create_menu(self):
         """Create menu bar."""
@@ -722,34 +849,44 @@ class PcgToolsGUI:
         welcome_frame = ttk.Frame(self.root)
         welcome_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
         
-        ttk.Label(
+        title_label = ttk.Label(
             welcome_frame,
             text="PCG Tools - Korg PCG File Editor",
             font=('Arial', 16, 'bold')
-        ).pack(pady=20)
+        )
+        title_label.pack(pady=20)
         
-        ttk.Label(
+        subtitle_label = ttk.Label(
             welcome_frame,
             text="macOS Compatible Version",
             font=('Arial', 12)
-        ).pack(pady=5)
+        )
+        subtitle_label.pack(pady=5)
         
-        ttk.Label(
+        info_label = ttk.Label(
             welcome_frame,
             text="Open PCG files to edit patches",
             font=('Arial', 10)
-        ).pack(pady=10)
+        )
+        info_label.pack(pady=10)
         
-        ttk.Button(
+        open_button = ttk.Button(
             welcome_frame,
             text="Open PCG File",
             command=self.open_file,
             width=20
-        ).pack(pady=10)
+        )
+        open_button.pack(pady=10)
         
         # Status bar
         self.status_bar = tk.Label(self.root, text="Ready", relief=tk.SUNKEN, anchor=tk.W, padx=5)
         self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
+        
+        # Force immediate rendering on macOS
+        self.root.update_idletasks()
+        self.root.update()
+        welcome_frame.update_idletasks()
+        welcome_frame.update()
     
     def open_file(self, filename=None):
         """Open a PCG file."""

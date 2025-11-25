@@ -391,16 +391,162 @@ class PcgBinaryParser:
     def parse_sls1_chunk(self, pcg: PcgFile):
         """Parse SLS1 chunk containing set lists.
         
-        Kronos SLS1 structure (discovered through binary analysis):
-        - SLS1 header contains sub-chunks (SLD1, SDB1)
-        - First entry: "Preload Set List" (skip)
-        - Next 16 entries: Setlist names with marker (1E 02 00 00) + 24-byte name
-        - Following entries: Slot names (128 per setlist × 16 setlists)
-        - After each slot name (at +24): patch reference data (8 bytes)
-          Byte 0-1: Patch index (little-endian)
-          Byte 2: Bank ID
-          Byte 3: Patch type (0x30=Combi, 0x20=Program)
-          Byte 4-5: Transpose/Volume
+        Kronos has TWO setlist formats in the file:
+        1. OLD format: Marker-based with slot 111 as display name
+        2. NEW format: Direct slot names with 0x28 0x0F 0x01 0x00 separator
+        
+        The Kronos uses the NEW format for display. This parser reads that format.
+        """
+        from .models import SetList, SetListSlot
+        
+        # Try to parse the NEW format first (what Kronos actually uses)
+        if self._parse_new_setlist_format(pcg):
+            debug_print("Parsed setlists using NEW format")
+            # Now parse SLD1 to get actual slot names
+            self._parse_sld1_slot_data(pcg)
+            return
+        
+        # Fallback to OLD format if NEW format not found
+        debug_print("NEW format not found, trying OLD format")
+        self._parse_old_setlist_format(pcg)
+    
+    def _parse_new_setlist_format(self, pcg: PcgFile):
+        """Parse the NEW setlist format that Kronos actually uses.
+        
+        Structure:
+        - Marker: 0x1E 0x02 0x00 0x00
+        - Setlist name (24 bytes, null-terminated)
+        - Separator: 0x28 0x0F 0x01 0x00
+        - First slot name (24 bytes, no marker)
+        - Remaining 127 slots, each with:
+          * Marker: 0x1E 0x02 0x00 0x00
+          * Slot name (24 bytes, null-terminated)
+        """
+        from .models import SetList, SetListSlot
+        
+        # Find SLS1 chunk first
+        sls1_offset = self.data.find(b'SLS1')
+        if sls1_offset < 0:
+            return False
+        
+        # Get SLS1 chunk size
+        sls1_size = self.get_int(sls1_offset + 4, 4)
+        sls1_end = sls1_offset + 8 + sls1_size
+        
+        # Search for the separator pattern within SLS1 chunk only
+        separator = b'\x28\x0F\x01\x00'
+        marker = b'\x1E\x02\x00\x00'
+        
+        # Find all setlists by looking for the separator
+        setlist_offsets = []
+        pos = sls1_offset + 8  # Start after SLS1 header
+        while pos < sls1_end:
+            pos = self.data.find(separator, pos)
+            if pos == -1 or pos >= sls1_end:
+                break
+            
+            # Check if there's a setlist name before this separator
+            # Setlist name should be 24 bytes before the separator
+            name_offset = pos - 24
+            if name_offset >= sls1_offset:
+                # Check if there's a marker before the name
+                marker_offset = name_offset - 4
+                if marker_offset >= sls1_offset:
+                    check_marker = self.data[marker_offset:marker_offset+4]
+                    if check_marker == marker:
+                        setlist_offsets.append(marker_offset)
+            
+            pos += 4
+        
+        if len(setlist_offsets) == 0:
+            return False
+        
+        # Limit to 16 setlists (Kronos has 16 setlists)
+        setlist_offsets = setlist_offsets[:16]
+        
+        debug_print(f"Found {len(setlist_offsets)} setlists in NEW format")
+        
+        # Parse each setlist
+        for sl_idx, setlist_start in enumerate(setlist_offsets):
+            # Read setlist name (skip marker, read 24 bytes)
+            name_offset = setlist_start + 4
+            sl_name = self.get_string(name_offset, 24)
+            
+            if not sl_name:
+                sl_name = f"Set List {sl_idx + 1}"
+            
+            setlist = SetList(
+                index=sl_idx,
+                name=sl_name,
+                description="",
+                color=0
+            )
+            
+            # After name + separator, read 128 slots
+            # First slot has NO marker, just the name
+            # Subsequent slots have marker + name
+            slots_start = name_offset + 24 + 4  # name + separator
+            
+            # Read all 128 slots
+            # First slot (index 0) has NO marker, just the name
+            slot_name = self.get_string(slots_start, 24)
+            slot = SetListSlot(
+                set_list_index=sl_idx,
+                slot_index=0,
+                name=slot_name if slot_name else "",
+                notes="",
+                patch_type="",
+                patch_bank="",
+                patch_index=0,
+                transpose=0,
+                volume=127
+            )
+            setlist.slots.append(slot)
+            
+            # Read remaining 127 slots (with markers)
+            # After first slot name (24 bytes), we expect marker + name pattern
+            current_pos = slots_start + 24  # After first slot name
+            
+            for slot_idx in range(1, 128):
+                # Check if there's enough data
+                if current_pos + 28 > len(self.data):
+                    break
+                
+                slot_marker = self.data[current_pos:current_pos+4]
+                if slot_marker == marker:
+                    # Read slot name
+                    slot_name = self.get_string(current_pos + 4, 24)
+                    
+                    # Add ALL slots, even if empty (to maintain proper indices)
+                    slot = SetListSlot(
+                        set_list_index=sl_idx,
+                        slot_index=slot_idx,
+                        name=slot_name if slot_name else "",
+                        notes="",
+                        patch_type="",
+                        patch_bank="",
+                        patch_index=0,
+                        transpose=0,
+                        volume=127
+                    )
+                    setlist.slots.append(slot)
+                    
+                    current_pos += 28  # marker + name
+                else:
+                    # No marker found - this might be the end of this setlist
+                    # or the start of the next setlist
+                    break
+            
+            pcg.set_lists.append(setlist)
+            debug_print(f"Set list {sl_idx}: {sl_name}, {len(setlist.slots)} slots")
+        
+        pcg.has_set_lists = len(pcg.set_lists) > 0
+        return True
+    
+    def _parse_old_setlist_format(self, pcg: PcgFile):
+        """Parse the OLD setlist format (fallback).
+        
+        This is the original format we were parsing before.
         """
         from .models import SetList, SetListSlot
         
@@ -432,15 +578,35 @@ class PcgBinaryParser:
         
         if not name_offsets:
             debug_print("No setlist names found")
+            pcg.has_set_lists = False
             return
         
         debug_print(f"Found {len(name_offsets)} potential name entries")
+        
+        # Validate: We need at least 16 entries for setlist names
+        # If we have fewer than 16, this probably isn't a real setlist section
+        if len(name_offsets) < 16:
+            debug_print(f"Too few entries ({len(name_offsets)}) for valid setlists, skipping")
+            pcg.has_set_lists = False
+            return
         
         # Parse as 16 setlists with 128 slots each
         # Structure: First 16 marker entries are setlist names
         # Then 128 slot names for each setlist (16 × 128 = 2048 slots)
         num_setlists = 16
         slots_per_setlist = 128
+        
+        # Validate the first few names to ensure they're reasonable
+        valid_count = 0
+        for i in range(min(5, len(name_offsets))):
+            name = self.get_string(name_offsets[i], 24)
+            if name and len(name) >= 2 and name.isprintable():
+                valid_count += 1
+        
+        if valid_count < 3:
+            debug_print(f"Names don't look valid (only {valid_count}/5 printable), skipping setlists")
+            pcg.has_set_lists = False
+            return
         
         # Parse each setlist
         for sl_idx in range(num_setlists):
@@ -541,9 +707,21 @@ class PcgBinaryParser:
                 
                 setlist.slots.append(slot)
             
+            # Kronos convention: Slot 111 contains the user-visible setlist name
+            # Use it as the display name if it exists
+            slot_111_name = None
+            for slot in setlist.slots:
+                if slot.slot_index == 111:
+                    slot_111_name = slot.name
+                    break
+            
+            if slot_111_name and slot_111_name.strip():
+                setlist.name = slot_111_name
+                debug_print(f"Set list {sl_idx}: Using slot 111 name: {slot_111_name}")
+            
             # Add setlist even if empty (to maintain indices)
             pcg.set_lists.append(setlist)
-            debug_print(f"Set list {sl_idx}: {sl_name}, {len(setlist.slots)} slots")
+            debug_print(f"Set list {sl_idx}: {setlist.name}, {len(setlist.slots)} slots")
     
     def _parse_cbk1_chunk(self, pcg: PcgFile, offset: int) -> int:
         """Parse a CBK1 (Combi Bank) chunk."""
@@ -726,3 +904,199 @@ class PcgBinaryParser:
                 return f"U-{first_letter}{second_letter}"
             else:
                 return f"U-{user_index}"
+    
+    def _parse_sld1_slot_data(self, pcg: PcgFile):
+        """Parse SLD1 chunk to get actual slot names and data.
+        
+        SLD1 contains the real slot data with actual names, patch references, etc.
+        Each slot entry is 7810 bytes (0x1E82), with the name at offset +24.
+        
+        The Kronos has TWO names per slot:
+        - Custom label (from SLS1) - stored in slot.description
+        - Actual patch name (from SLD1) - stored in slot.name
+        """
+        if not pcg.set_lists:
+            return
+        
+        # Find SLD1 chunk (it's inside SLS1)
+        sld1_offset = self.data.find(b'SLD1')
+        if sld1_offset < 0:
+            debug_print("SLD1 chunk not found")
+            return
+        
+        debug_print(f"Found SLD1 at offset {sld1_offset:08X}")
+        
+        # Find the first slot data by looking for a known pattern
+        # We'll search for CBK1 (Combi Bank) markers which precede slot data
+        cbk1_offset = self.data.find(b'CBK1', sld1_offset)
+        if cbk1_offset < 0:
+            debug_print("No CBK1 marker found in SLD1")
+            return
+        
+        # The first slot name is 24 bytes after CBK1
+        first_slot_start = cbk1_offset
+        first_slot_name_pos = first_slot_start + 24
+        
+        debug_print(f"First slot data at offset {first_slot_start:08X}")
+        
+        # Each slot is 7810 bytes (0x1E82)
+        SLOT_SIZE = 0x1E82
+        
+        # Parse slots for each setlist
+        # Assuming slots are stored in order: setlist 0 slots 0-127, setlist 1 slots 0-127, etc.
+        for sl_idx, setlist in enumerate(pcg.set_lists):
+            if sl_idx >= 16:  # Only 16 setlists
+                break
+            
+            # Calculate offset for this setlist's slots
+            setlist_slot_offset = first_slot_start + (sl_idx * 128 * SLOT_SIZE)
+            
+            # Update each slot with data from SLD1
+            for slot_idx in range(128):
+                slot_offset = setlist_slot_offset + (slot_idx * SLOT_SIZE)
+                name_offset = slot_offset + 24
+                
+                # Check if we're still within the file
+                if name_offset + 24 > len(self.data):
+                    break
+                
+                # Read actual patch name from SLD1
+                sld1_name = self.get_string(name_offset, 24)
+                
+                # Find or create the slot in our model
+                slot = None
+                for s in setlist.slots:
+                    if s.slot_index == slot_idx:
+                        slot = s
+                        break
+                
+                if slot:
+                    # Save the SLS1 name as custom label (if it exists)
+                    if slot.name:
+                        slot.description = slot.name  # Custom label from SLS1
+                    
+                    # Update with the real patch name from SLD1
+                    if sld1_name:
+                        slot.name = sld1_name
+                        debug_print(f"Updated slot {sl_idx}-{slot_idx}: label='{slot.description}', name='{sld1_name}'")
+        
+        debug_print(f"Finished parsing SLD1 slot data")
+
+    def parse_stl1_chunk(self, pcg: PcgFile):
+        """Parse STL1 chunk to get complete setlist data including color and text size.
+        
+        STL1/SBK1 contains the authoritative setlist data with:
+        - Setlist names
+        - Slot names  
+        - Color (byte +24 from slot name)
+        - Text size (byte +29 from slot name)
+        - Notes/descriptions
+        
+        This should be called AFTER parse_sls1_chunk to override with complete data.
+        """
+        from .models import SetList, SetListSlot
+        
+        # Find STL1 chunk
+        stl1_offset = self.data.find(b'STL1')
+        if stl1_offset < 0:
+            debug_print("STL1 chunk not found - file may not have full setlist data")
+            return
+        
+        debug_print(f"Found STL1 at offset {stl1_offset:08X}")
+        
+        # Find SBK1 within STL1
+        sbk1_offset = self.data.find(b'SBK1', stl1_offset)
+        if sbk1_offset < 0:
+            debug_print("No SBK1 marker found in STL1")
+            return
+        
+        debug_print(f"Found SBK1 at offset {sbk1_offset:08X}")
+        
+        # SBK1 data starts at +8 (after 'SBK1' and size)
+        sbk1_data_start = sbk1_offset + 8
+        
+        # Structure:
+        # +0: Header (16 bytes)
+        # +16: Setlist name (24 bytes)
+        # +40: First slot (slot 0)
+        # Each slot is ~542 bytes
+        
+        # Read setlist name
+        setlist_name_offset = sbk1_data_start + 16
+        setlist_name = self.get_string(setlist_name_offset, 24)
+        
+        debug_print(f"STL1 Setlist: '{setlist_name}'")
+        
+        # Check if we already have this setlist from SLS1 parsing
+        existing_setlist = None
+        for sl in pcg.set_lists:
+            if sl.name == setlist_name:
+                existing_setlist = sl
+                break
+        
+        # If not found, create new setlist (index 0 for now)
+        if not existing_setlist:
+            debug_print(f"Creating new setlist from STL1: '{setlist_name}'")
+            existing_setlist = SetList(index=0, name=setlist_name)
+            # Replace or add as first setlist
+            if len(pcg.set_lists) > 0:
+                pcg.set_lists[0] = existing_setlist
+            else:
+                pcg.set_lists.append(existing_setlist)
+        
+        # Parse slots from STL1/SBK1
+        # Start at +40 from SBK1 data start
+        current_offset = sbk1_data_start + 40
+        
+        # Approximate slot size is 542 bytes, but we'll search for each slot
+        # to handle variable-length notes/descriptions
+        APPROX_SLOT_SIZE = 542
+        
+        # Read up to 128 slots
+        for slot_idx in range(128):
+            # Check if we have enough data
+            if current_offset + 100 > len(self.data):
+                break
+            
+            # Read slot name (24 bytes)
+            slot_name = self.get_string(current_offset, 24)
+            
+            # Color at +24 from slot name start
+            color = self.data[current_offset + 24] if current_offset + 24 < len(self.data) else 0
+            
+            # Text size at +29 from slot name start  
+            text_size = self.data[current_offset + 29] if current_offset + 29 < len(self.data) else 0
+            
+            # Find or create slot
+            slot = None
+            for s in existing_setlist.slots:
+                if s.slot_index == slot_idx:
+                    slot = s
+                    break
+            
+            if not slot and slot_name:
+                # Create new slot
+                slot = SetListSlot(
+                    set_list_index=existing_setlist.index,
+                    slot_index=slot_idx,
+                    name=slot_name,
+                    color=color,
+                    text_size=text_size
+                )
+                existing_setlist.slots.append(slot)
+            elif slot:
+                # Update existing slot with STL1 data
+                if slot_name:
+                    slot.name = slot_name
+                slot.color = color
+                slot.text_size = text_size
+            
+            if slot_name:
+                debug_print(f"Slot {slot_idx}: '{slot_name}' color={color} size={text_size}")
+            
+            # Move to next slot
+            # Use approximate slot size
+            current_offset += APPROX_SLOT_SIZE
+        
+        debug_print(f"Finished parsing STL1: {len(existing_setlist.slots)} slots")
+        pcg.has_set_lists = len(pcg.set_lists) > 0

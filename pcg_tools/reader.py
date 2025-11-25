@@ -44,6 +44,7 @@ class PcgReader:
         parser.parse_prg1_chunk(pcg)
         parser.parse_cmb1_chunk(pcg)
         parser.parse_sls1_chunk(pcg)
+        parser.parse_stl1_chunk(pcg)  # Parse color and text size metadata
         
         return pcg
     

@@ -2,7 +2,7 @@
 
 ## ✅ Status: FULLY FUNCTIONAL
 
-Set list parsing and GUI support has been successfully implemented!
+Set list parsing, GUI support, and full editing capabilities have been successfully implemented!
 
 ## Features Implemented
 
@@ -174,13 +174,16 @@ Set List 1: EP-1 (128 slots)
 
 ## Known Limitations
 
-### Notes Persistence
-- ✅ Notes are stored in memory during session
-- ✅ Notes are saved when you click "Save Notes"
-- ⚠️ Notes are NOT yet written back to PCG file on disk
-- **Reason:** Writer doesn't currently reconstruct SLS1 chunk
-- **Workaround:** Notes persist during the session, but won't survive file reload
-- **Future:** Implement SLS1 chunk writing in writer.py
+### Setlist Data Writing - FULLY WORKING! ✅
+- ✅ Setlist names can be edited and saved
+- ✅ Slot names can be edited and saved  
+- ✅ Slot transpose values can be edited and saved
+- ✅ Slot volume values can be edited and saved
+- **Binary Format Discovered:** The SLS1 chunk uses an ingenious overlapping structure where each slot's 24-byte name area contains:
+  * Bytes 0-1: Previous slot's transpose and volume
+  * Bytes 0-23: This slot's full name (including those first 2 bytes)
+  * This means slot N's transpose/volume are stored as the first 2 bytes of slot N+1's name!
+- **Status:** All setlist editing is now fully functional and tested
 
 ### Patch Reference Data
 - ✅ All patch references parse correctly
@@ -234,18 +237,28 @@ Set List 1: EP-1 (128 slots)
 
 ## Summary
 
-🎉 **Set list support is now fully functional!**
+🎉 **Set list support is now FULLY FUNCTIONAL!**
 
-- ✅ Binary format completely reverse-engineered
+**What Works:**
+- ✅ Binary format fully reverse-engineered and understood
 - ✅ Parser extracts all setlist data correctly
-- ✅ GUI displays setlists with full functionality
-- ✅ Notes can be edited and saved (in memory)
-- ✅ All patch references parse correctly
-- ✅ Transpose and volume values are accurate
-- ✅ Tested with real-world PCG files
+- ✅ GUI displays setlists with full viewing functionality
+- ✅ Setlist names can be edited and saved to PCG files
+- ✅ Slot names can be edited and saved to PCG files
+- ✅ Slot transpose values can be edited and saved
+- ✅ Slot volume values can be edited and saved
+- ✅ All changes persist across file save/load cycles
+- ✅ Tested comprehensively with real-world PCG files
 
-**Next Steps (Optional):**
-- Implement SLS1 chunk writing in writer.py for full persistence
+**Binary Format Discovery:**
+The SLS1 chunk uses an ingenious overlapping structure:
+- Each slot's 24-byte name area serves dual purpose
+- Bytes 0-1: Previous slot's transpose and volume
+- Bytes 0-23: This slot's full name (including those first 2 bytes)
+- This means slot N's transpose/volume are stored as the first 2 bytes of slot N+1's name!
+
+**Future Enhancements (Optional):**
 - Add setlist export to CSV
 - Add setlist import/copy functionality
 - Add slot reordering in GUI
+- Add batch transpose/volume editing

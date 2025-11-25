@@ -1,0 +1,5 @@
+#!/bin/bash
+# PCG Tools launcher script - uses virtual environment with working Tk
+
+cd "$(dirname "$0")"
+./venv/bin/python -m pcg_tools "$@"

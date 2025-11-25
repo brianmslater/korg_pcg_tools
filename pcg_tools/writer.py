@@ -50,7 +50,127 @@ class PcgWriter:
                     if offset + len(combi.raw_data) <= len(raw_data):
                         raw_data[offset:offset+len(combi.raw_data)] = combi.raw_data
         
+        # Update setlist data (names only - patch data format not yet fully understood)
+        self._update_setlist_data(raw_data)
+        
         self.pcg.raw_data = bytes(raw_data)
+    
+    def _update_setlist_data(self, raw_data: bytearray):
+        """Update setlist and slot data in the SLS1 chunk.
+        
+        NEW format structure:
+        - Marker: 0x1E 0x02 0x00 0x00
+        - Setlist name (24 bytes)
+        - Separator: 0x28 0x0F 0x01 0x00
+        - First slot name (24 bytes, no marker)
+        - Remaining 127 slots with marker + name (28 bytes each)
+        """
+        if not self.pcg.set_lists:
+            return
+        
+        # Find SLS1 chunk
+        sls1_offset = raw_data.find(b'SLS1')
+        if sls1_offset < 0:
+            return
+        
+        # Get SLS1 chunk size
+        sls1_size = struct.unpack('<I', raw_data[sls1_offset+4:sls1_offset+8])[0]
+        sls1_end = sls1_offset + 8 + sls1_size
+        
+        # Find all setlists by looking for separators
+        separator = b'\x28\x0F\x01\x00'
+        marker = b'\x1E\x02\x00\x00'
+        
+        setlist_offsets = []
+        pos = sls1_offset + 8
+        while pos < sls1_end:
+            pos = raw_data.find(separator, pos)
+            if pos == -1 or pos >= sls1_end:
+                break
+            
+            # Check if there's a marker before the name (24 bytes before separator)
+            name_offset = pos - 24
+            marker_offset = name_offset - 4
+            if marker_offset >= sls1_offset:
+                check_marker = raw_data[marker_offset:marker_offset+4]
+                if check_marker == marker:
+                    setlist_offsets.append(marker_offset)
+            
+            pos += 4
+        
+        if len(setlist_offsets) == 0:
+            return
+        
+        # Limit to 16 setlists
+        setlist_offsets = setlist_offsets[:16]
+        
+        # Update each setlist
+        for sl_idx, setlist_start in enumerate(setlist_offsets):
+            if sl_idx >= len(self.pcg.set_lists):
+                break
+            
+            setlist = self.pcg.set_lists[sl_idx]
+            
+            # Update setlist name (skip marker, write 24 bytes)
+            name_offset = setlist_start + 4
+            name_bytes = setlist.name.encode('ascii', errors='ignore')[:24]
+            name_bytes = name_bytes.ljust(24, b'\x00')
+            raw_data[name_offset:name_offset+24] = name_bytes
+            
+            # Update slots
+            # After name + separator, slots begin
+            slots_start = name_offset + 24 + 4  # name + separator
+            
+            # Create a map of slot_index -> slot for quick lookup
+            slot_map = {slot.slot_index: slot for slot in setlist.slots}
+            
+            # Update first slot (no marker)
+            if 0 in slot_map:
+                slot = slot_map[0]
+                name_bytes = slot.name.encode('ascii', errors='ignore')[:24]
+                name_bytes = name_bytes.ljust(24, b'\x00')
+                raw_data[slots_start:slots_start+24] = name_bytes
+            
+            # Update remaining slots (with markers)
+            current_pos = slots_start + 24
+            for slot_idx in range(1, 128):
+                # Check if marker exists
+                if current_pos + 28 > len(raw_data):
+                    break
+                
+                check_marker = raw_data[current_pos:current_pos+4]
+                if check_marker != marker:
+                    break
+                
+                # Update slot name if it exists in our data
+                if slot_idx in slot_map:
+                    slot = slot_map[slot_idx]
+                    name_bytes = slot.name.encode('ascii', errors='ignore')[:24]
+                    name_bytes = name_bytes.ljust(24, b'\x00')
+                    raw_data[current_pos+4:current_pos+28] = name_bytes
+                
+                current_pos += 28
+    
+    def _encode_bank_id(self, bank_id: str) -> int:
+        """Encode bank ID string to byte value.
+        
+        Format: I-A to I-H = 0x00 to 0x07
+                U-A to U-G = 0x20 to 0x26
+        """
+        if not bank_id or len(bank_id) < 3:
+            return 0x00
+        
+        bank_type = bank_id[0]  # 'I' or 'U'
+        bank_letter = bank_id[2]  # 'A', 'B', 'C', etc.
+        
+        if bank_type == 'I':
+            # Internal banks: I-A = 0x00, I-B = 0x01, etc.
+            return ord(bank_letter) - ord('A')
+        elif bank_type == 'U':
+            # User banks: U-A = 0x20, U-B = 0x21, etc.
+            return 0x20 + (ord(bank_letter) - ord('A'))
+        
+        return 0x00
     
     def _build_header(self) -> bytes:
         """Build PCG file header."""

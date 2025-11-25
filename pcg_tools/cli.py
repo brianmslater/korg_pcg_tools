@@ -101,20 +101,30 @@ def export(input_file, output_file, format):
 
 
 @cli.command()
-def gui():
+@click.option('--qt', is_flag=True, help='Use Qt GUI (recommended for macOS)')
+def gui(qt):
     """Launch the graphical user interface."""
     try:
         import sys
         import platform
         
-        # Use macOS-compatible GUI for old Tk versions
+        # Try Qt GUI first if requested or on macOS
+        if qt or platform.system() == 'Darwin':
+            try:
+                click.echo("Using Qt GUI")
+                from .gui_qt import main as qt_main
+                qt_main()
+                return
+            except ImportError:
+                if qt:
+                    click.echo("Qt GUI not available. Install with: pip install PySide6", err=True)
+                    sys.exit(1)
+                click.echo("Qt not available, falling back to tkinter GUI")
+        
+        # Fall back to tkinter GUI
         if platform.system() == 'Darwin':
-            import tkinter
-            if tkinter.TkVersion < 8.6:
-                click.echo("Using macOS-compatible GUI (Tk 8.5 detected)")
-                from .gui_macos import launch_gui
-            else:
-                from .gui import launch_gui
+            click.echo("Using macOS tkinter GUI")
+            from .gui_macos import launch_gui
         else:
             from .gui import launch_gui
         
