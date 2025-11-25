@@ -374,9 +374,19 @@ class PcgMainWindow(QMainWindow):
             volume_item = QTableWidgetItem(str(slot.volume))
             self.slots_table.setItem(row, 4, volume_item)
             
-            # Color - read-only (edit via dialog)
+            # Color - read-only (edit via dialog) with visual indicator
             color_item = QTableWidgetItem(slot.color_name)
             color_item.setFlags(color_item.flags() & ~Qt.ItemIsEditable)
+            
+            # Add color background based on slot color value
+            from PySide6.QtGui import QColor
+            bg_color = self._get_display_color(slot.color)
+            if bg_color:
+                color_item.setBackground(bg_color)
+                # Use white text for dark backgrounds
+                if bg_color.lightness() < 128:
+                    color_item.setForeground(QColor(255, 255, 255))
+            
             self.slots_table.setItem(row, 5, color_item)
             
             # Text Size - read-only (edit via dialog)
@@ -385,6 +395,29 @@ class PcgMainWindow(QMainWindow):
             self.slots_table.setItem(row, 6, size_item)
         
         self.slots_table.blockSignals(False)
+    
+    def _get_display_color(self, color_value):
+        """Get QColor for display based on slot color value."""
+        from PySide6.QtGui import QColor
+        
+        # Map color values to RGB colors for display
+        color_map = {
+            0: None,  # Default - no color
+            16: QColor(220, 50, 50),    # Red
+            24: QColor(255, 140, 0),    # Orange
+            32: QColor(75, 0, 130),     # Indigo
+            40: QColor(255, 215, 0),    # Yellow
+            48: QColor(50, 205, 50),    # Green
+            56: QColor(0, 191, 255),    # Cyan
+            72: QColor(138, 43, 226),   # Violet
+            140: QColor(128, 0, 32),    # Burgundy
+            148: QColor(128, 0, 128),   # Purple
+            160: QColor(65, 105, 225),  # Blue
+            164: QColor(0, 0, 128),     # Navy
+            204: QColor(128, 128, 0),   # Olive
+        }
+        
+        return color_map.get(color_value, QColor(200, 200, 200))  # Light gray for unknown
     
     def on_slot_item_changed(self, item):
         """Handle slot table item changes."""
@@ -492,24 +525,20 @@ class PcgMainWindow(QMainWindow):
         name_edit.setMaxLength(24)
         form.addRow("Name:", name_edit)
         
-        # Color selector
+        # Color selector - use expanded color mapping
+        from .models import SLOT_COLOR_VALUES
+        
         color_combo = QComboBox()
-        color_options = [
-            ("Default", 0),
-            ("Indigo", 32),
-            ("Burgundy", 140),
-            ("Unknown (204)", 204),
-            ("Unknown (160)", 160),
-            ("Unknown (164)", 164),
-            ("Unknown (148)", 148),
-        ]
-        for color_name, color_value in color_options:
+        # Sort colors by value for consistent ordering
+        sorted_colors = sorted(SLOT_COLOR_VALUES.items(), key=lambda x: x[1])
+        
+        for color_name, color_value in sorted_colors:
             color_combo.addItem(color_name, color_value)
         
         # Set current color
         current_index = 0
-        for i, (_, value) in enumerate(color_options):
-            if value == slot.color:
+        for i in range(color_combo.count()):
+            if color_combo.itemData(i) == slot.color:
                 current_index = i
                 break
         color_combo.setCurrentIndex(current_index)

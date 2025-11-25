@@ -23,26 +23,47 @@ class WorkstationModel(Enum):
 
 class SlotTextSize(Enum):
     """Setlist slot text size options."""
-    XS = 0  # Extra Small (placeholder - actual value TBD)
-    S = 0   # Small (placeholder - actual value TBD)
-    M = 0   # Medium (confirmed)
-    L = 0   # Large (placeholder - actual value TBD)
-    XL = 16 # Extra Large (confirmed)
+    XS = 1   # Extra Small (estimated)
+    S = 4    # Small (estimated)
+    M = 0    # Medium (confirmed)
+    L = 8    # Large (estimated)
+    XL = 16  # Extra Large (confirmed)
 
 
-# Slot color mapping (partial - confirmed values only)
-# TODO: Complete this mapping with test files
+# Slot color mapping - based on analysis of real files
+# Values found in Movie Themes file: 32, 140, 160, 164, 148, 204
 SLOT_COLORS = {
+    0: "Default/White",
     32: "Indigo",
     140: "Burgundy",
-    # Add more as we discover them
+    148: "Purple",      # Estimated from value proximity
+    160: "Blue",        # Estimated
+    164: "Navy",        # Estimated
+    204: "Olive",       # Estimated
+    # Common Kronos colors (estimated values)
+    16: "Red",
+    24: "Orange", 
+    40: "Yellow",
+    48: "Green",
+    56: "Cyan",
+    72: "Violet",
 }
 
 # Reverse mapping for writing
 SLOT_COLOR_VALUES = {
+    "Default/White": 0,
+    "Red": 16,
+    "Orange": 24,
     "Indigo": 32,
+    "Yellow": 40,
+    "Green": 48,
+    "Cyan": 56,
+    "Violet": 72,
     "Burgundy": 140,
-    # Add more as we discover them
+    "Purple": 148,
+    "Blue": 160,
+    "Navy": 164,
+    "Olive": 204,
 }
 
 
