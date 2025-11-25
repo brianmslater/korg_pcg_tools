@@ -199,6 +199,10 @@ class PcgMainWindow(QMainWindow):
         self.setlist_combo.currentIndexChanged.connect(self.load_setlist_slots)
         selector_layout.addWidget(self.setlist_combo)
         
+        self.new_setlist_button = QPushButton("New Setlist")
+        self.new_setlist_button.clicked.connect(self.create_new_setlist)
+        selector_layout.addWidget(self.new_setlist_button)
+        
         self.edit_setlist_button = QPushButton("Edit Setlist Name")
         self.edit_setlist_button.clicked.connect(self.edit_setlist_name)
         selector_layout.addWidget(self.edit_setlist_button)
@@ -293,6 +297,7 @@ class PcgMainWindow(QMainWindow):
         if not self.pcg:
             return
         
+        program_count = 0
         for bank in self.pcg.program_banks:
             for prog in bank.patches:
                 row = self.programs_table.rowCount()
@@ -304,6 +309,13 @@ class PcgMainWindow(QMainWindow):
                 self.programs_table.setItem(row, 3, QTableWidgetItem(prog.category.sub_name if prog.category else ""))
                 self.programs_table.setItem(row, 4, QTableWidgetItem(prog.engine if hasattr(prog, 'engine') else ""))
                 self.programs_table.setItem(row, 5, QTableWidgetItem("✓" if prog.favorite else ""))
+                program_count += 1
+        
+        # Update status bar with count
+        if program_count == 0:
+            self.statusbar.showMessage(f"No programs found in file (found {len(self.pcg.program_banks)} program banks)")
+        else:
+            self.statusbar.showMessage(f"Loaded {program_count} programs from {len(self.pcg.program_banks)} banks")
     
     def load_combis(self):
         """Load combis into table."""
@@ -312,6 +324,7 @@ class PcgMainWindow(QMainWindow):
         if not self.pcg:
             return
         
+        combi_count = 0
         for bank in self.pcg.combi_banks:
             for combi in bank.patches:
                 row = self.combis_table.rowCount()
@@ -322,6 +335,11 @@ class PcgMainWindow(QMainWindow):
                 self.combis_table.setItem(row, 2, QTableWidgetItem(combi.category.name if combi.category else ""))
                 self.combis_table.setItem(row, 3, QTableWidgetItem(combi.category.sub_name if combi.category else ""))
                 self.combis_table.setItem(row, 4, QTableWidgetItem("✓" if combi.favorite else ""))
+                combi_count += 1
+        
+        # Update status bar with count
+        if combi_count > 0:
+            self.statusbar.showMessage(f"Loaded {combi_count} combis from {len(self.pcg.combi_banks)} banks")
     
     def load_setlists(self):
         """Load setlists into combo box."""
@@ -597,6 +615,81 @@ class PcgMainWindow(QMainWindow):
             
             self.mark_dirty()
             self.load_setlist_slots()
+    
+    def create_new_setlist(self):
+        """Create a new setlist."""
+        from PySide6.QtWidgets import QInputDialog
+        
+        if not self.pcg:
+            QMessageBox.warning(self, "Warning", "No PCG file loaded.")
+            return
+        
+        # Get setlist name
+        name, ok = QInputDialog.getText(
+            self,
+            "New Setlist",
+            "Setlist Name (max 24 characters):",
+            text="New Setlist"
+        )
+        
+        if not ok or not name:
+            return
+        
+        if len(name) > 24:
+            QMessageBox.warning(self, "Warning", "Name too long. Maximum 24 characters.")
+            return
+        
+        # Find next available setlist index
+        existing_indices = [sl.index for sl in self.pcg.set_lists]
+        next_index = 0
+        while next_index in existing_indices and next_index < 128:
+            next_index += 1
+        
+        if next_index >= 128:
+            QMessageBox.warning(self, "Warning", "Maximum number of setlists (128) reached.")
+            return
+        
+        # Create new setlist
+        from .models import SetList, SetListSlot
+        new_setlist = SetList(
+            index=next_index,
+            name=name,
+            description="",
+            color=0,
+            slots=[]
+        )
+        
+        # Create 128 empty slots
+        for i in range(128):
+            slot = SetListSlot(
+                set_list_index=next_index,
+                slot_index=i,
+                name=f"Slot {i}",
+                description="",
+                notes="",
+                patch_type="",
+                patch_bank="",
+                patch_index=0,
+                transpose=0,
+                volume=127,
+                hold=False,
+                color=0,
+                text_size=0
+            )
+            new_setlist.slots.append(slot)
+        
+        self.pcg.set_lists.append(new_setlist)
+        self.pcg.has_set_lists = True
+        self.mark_dirty()
+        self.load_setlists()
+        
+        # Select the new setlist
+        for i in range(self.setlist_combo.count()):
+            if self.setlist_combo.itemData(i) == new_setlist:
+                self.setlist_combo.setCurrentIndex(i)
+                break
+        
+        QMessageBox.information(self, "Success", f"Created new setlist: {name}")
     
     def edit_setlist_name(self):
         """Edit setlist name."""
