@@ -375,14 +375,17 @@ class PcgMainWindow(QMainWindow):
             slot_item.setFlags(slot_item.flags() & ~Qt.ItemIsEditable)
             self.slots_table.setItem(row, 0, slot_item)
             
-            # Custom label (from SLS1) - editable
-            label_item = QTableWidgetItem(slot.description if slot.description else "")
-            self.slots_table.setItem(row, 1, label_item)
+            # Slot Name (editable custom name)
+            name_item = QTableWidgetItem(slot.name if slot.name else "")
+            self.slots_table.setItem(row, 1, name_item)
             
-            # Actual patch name (from SLD1) - read-only for now
-            name_item = QTableWidgetItem(slot.name if slot.name else "(no name)")
-            name_item.setFlags(name_item.flags() & ~Qt.ItemIsEditable)
-            self.slots_table.setItem(row, 2, name_item)
+            # Patch Name (read-only - shows referenced patch)
+            patch_name = ""
+            if slot.patch_bank and slot.patch_type:
+                patch_name = f"{slot.patch_type[0]}-{slot.patch_bank}{slot.patch_index:03d}"
+            patch_item = QTableWidgetItem(patch_name)
+            patch_item.setFlags(patch_item.flags() & ~Qt.ItemIsEditable)
+            self.slots_table.setItem(row, 2, patch_item)
             
             # Transpose - editable
             transpose_item = QTableWidgetItem(str(slot.transpose))
@@ -463,9 +466,9 @@ class PcgMainWindow(QMainWindow):
                 new_name = item.text()
                 if len(new_name) > 24:
                     QMessageBox.warning(self, "Warning", "Slot name too long. Maximum 24 characters.")
-                    item.setText(slot.description if slot.description else "")
+                    item.setText(slot.name if slot.name else "")
                     return
-                slot.description = new_name
+                slot.name = new_name
                 self.mark_dirty()
             
             # Column 3: Transpose
