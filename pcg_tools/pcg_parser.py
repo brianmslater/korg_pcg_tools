@@ -963,6 +963,55 @@ class PcgBinaryParser:
                 # Read actual patch name from SLD1
                 sld1_name = self.get_string(name_offset, 24)
                 
+                # Parse patch reference data (8 bytes after the 24-byte name)
+                patch_data_offset = name_offset + 24
+                patch_type = ""
+                patch_bank = ""
+                patch_index = 0
+                transpose = 0
+                volume = 127
+                
+                if patch_data_offset + 8 <= len(self.data):
+                    try:
+                        # Read patch reference bytes
+                        patch_idx_low = self.data[patch_data_offset]
+                        patch_idx_high = self.data[patch_data_offset + 1]
+                        patch_index = patch_idx_low + (patch_idx_high << 8)
+                        
+                        bank_byte = self.data[patch_data_offset + 2]
+                        type_byte = self.data[patch_data_offset + 3]
+                        
+                        # Decode patch type
+                        if type_byte == 0x30:
+                            patch_type = "Combi"
+                        elif type_byte == 0x20:
+                            patch_type = "Program"
+                        
+                        # Decode bank ID
+                        if bank_byte < 0x08:
+                            patch_bank = f"I-{chr(65 + bank_byte)}"
+                        elif bank_byte >= 0x20:
+                            user_idx = bank_byte - 0x20
+                            if user_idx < 8:
+                                patch_bank = f"U-{chr(65 + user_idx)}"
+                            else:
+                                patch_bank = f"U-{user_idx}"
+                        else:
+                            patch_bank = f"I-{chr(65 + (bank_byte & 0x0F))}"
+                        
+                        # Transpose and volume
+                        if patch_data_offset + 5 < len(self.data):
+                            transpose_byte = self.data[patch_data_offset + 4]
+                            transpose = transpose_byte - 0x40 if transpose_byte < 0x80 else transpose_byte - 0x40
+                            volume = self.data[patch_data_offset + 5]
+                        
+                        # Validate patch index (should be 0-127)
+                        if patch_index > 127:
+                            patch_index = patch_index & 0x7F
+                        
+                    except Exception as e:
+                        debug_print(f"Error parsing patch data for slot {sl_idx}-{slot_idx}: {e}")
+                
                 # Find or create the slot in our model
                 slot = None
                 for s in setlist.slots:
@@ -978,7 +1027,15 @@ class PcgBinaryParser:
                     # Update with the real patch name from SLD1
                     if sld1_name:
                         slot.name = sld1_name
-                        debug_print(f"Updated slot {sl_idx}-{slot_idx}: label='{slot.description}', name='{sld1_name}'")
+                    
+                    # Update patch references
+                    if patch_type:
+                        slot.patch_type = patch_type
+                        slot.patch_bank = patch_bank
+                        slot.patch_index = patch_index
+                        slot.transpose = transpose
+                        slot.volume = volume
+                        debug_print(f"Updated slot {sl_idx}-{slot_idx}: name='{sld1_name}', patch={patch_type} {patch_bank}{patch_index:03d}")
         
         debug_print(f"Finished parsing SLD1 slot data")
 

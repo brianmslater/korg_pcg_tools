@@ -379,10 +379,18 @@ class PcgMainWindow(QMainWindow):
             name_item = QTableWidgetItem(slot.name if slot.name else "")
             self.slots_table.setItem(row, 1, name_item)
             
-            # Patch Name (read-only - shows referenced patch)
+            # Patch Name (read-only - shows actual patch name)
             patch_name = ""
-            if slot.patch_bank and slot.patch_type:
-                patch_name = f"{slot.patch_type[0]}-{slot.patch_bank}{slot.patch_index:03d}"
+            if slot.patch_bank and slot.patch_type and self.pcg:
+                # Look up the actual patch name
+                if slot.patch_type == "Program":
+                    prog = self.pcg.find_program(slot.patch_bank, slot.patch_index)
+                    if prog:
+                        patch_name = prog.name
+                elif slot.patch_type == "Combi":
+                    combi = self.pcg.find_combi(slot.patch_bank, slot.patch_index)
+                    if combi:
+                        patch_name = combi.name
             patch_item = QTableWidgetItem(patch_name)
             patch_item.setFlags(patch_item.flags() & ~Qt.ItemIsEditable)
             self.slots_table.setItem(row, 2, patch_item)
