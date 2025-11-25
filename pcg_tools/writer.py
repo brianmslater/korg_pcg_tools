@@ -53,6 +53,9 @@ class PcgWriter:
         # Update setlist data (names only - patch data format not yet fully understood)
         self._update_setlist_data(raw_data)
         
+        # Update STL1/SBK1 data (color, text_size, and complete slot data)
+        self._update_stl1_data(raw_data)
+        
         self.pcg.raw_data = bytes(raw_data)
     
     def _update_setlist_data(self, raw_data: bytearray):
@@ -150,6 +153,74 @@ class PcgWriter:
                     raw_data[current_pos+4:current_pos+28] = name_bytes
                 
                 current_pos += 28
+    
+    def _update_stl1_data(self, raw_data: bytearray):
+        """Update STL1/SBK1 chunk with color and text_size metadata.
+        
+        STL1/SBK1 structure:
+        - SBK1 data start + 16: Setlist name (24 bytes)
+        - SBK1 data start + 40: First slot
+        - Each slot: ~542 bytes
+          - +0: Slot name (24 bytes)
+          - +24: Color (1 byte)
+          - +29: Text size (1 byte)
+          - Rest: Notes/description
+        """
+        if not self.pcg.set_lists:
+            return
+        
+        # Find STL1 chunk
+        stl1_offset = raw_data.find(b'STL1')
+        if stl1_offset < 0:
+            # No STL1 chunk - file may not have full setlist data
+            return
+        
+        # Find SBK1 within STL1
+        sbk1_offset = raw_data.find(b'SBK1', stl1_offset)
+        if sbk1_offset < 0:
+            return
+        
+        # SBK1 data starts at +8
+        sbk1_data_start = sbk1_offset + 8
+        
+        # Update setlist name at +16
+        if len(self.pcg.set_lists) > 0:
+            setlist = self.pcg.set_lists[0]  # Currently only handling first setlist
+            setlist_name_offset = sbk1_data_start + 16
+            name_bytes = setlist.name.encode('ascii', errors='ignore')[:24]
+            name_bytes = name_bytes.ljust(24, b'\x00')
+            raw_data[setlist_name_offset:setlist_name_offset+24] = name_bytes
+            
+            # Update slots starting at +40
+            current_offset = sbk1_data_start + 40
+            APPROX_SLOT_SIZE = 542
+            
+            # Create slot map for quick lookup
+            slot_map = {slot.slot_index: slot for slot in setlist.slots}
+            
+            # Update each slot
+            for slot_idx in range(128):
+                if current_offset + 100 > len(raw_data):
+                    break
+                
+                if slot_idx in slot_map:
+                    slot = slot_map[slot_idx]
+                    
+                    # Update slot name (24 bytes)
+                    name_bytes = slot.name.encode('ascii', errors='ignore')[:24]
+                    name_bytes = name_bytes.ljust(24, b'\x00')
+                    raw_data[current_offset:current_offset+24] = name_bytes
+                    
+                    # Update color at +24
+                    if current_offset + 24 < len(raw_data):
+                        raw_data[current_offset + 24] = slot.color & 0xFF
+                    
+                    # Update text_size at +29
+                    if current_offset + 29 < len(raw_data):
+                        raw_data[current_offset + 29] = slot.text_size & 0xFF
+                
+                # Move to next slot
+                current_offset += APPROX_SLOT_SIZE
     
     def _encode_bank_id(self, bank_id: str) -> int:
         """Encode bank ID string to byte value.

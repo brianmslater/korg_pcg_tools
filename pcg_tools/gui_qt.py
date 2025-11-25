@@ -213,8 +213,8 @@ class PcgMainWindow(QMainWindow):
         
         # Slots table
         self.slots_table = QTableWidget()
-        self.slots_table.setColumnCount(5)
-        self.slots_table.setHorizontalHeaderLabels(["Slot", "Slot Name", "Patch Name", "Transpose", "Volume"])
+        self.slots_table.setColumnCount(7)
+        self.slots_table.setHorizontalHeaderLabels(["Slot", "Slot Name", "Patch Name", "Transpose", "Volume", "Color", "Size"])
         self.slots_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
         self.slots_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.slots_table.doubleClicked.connect(self.edit_selected)
@@ -373,6 +373,16 @@ class PcgMainWindow(QMainWindow):
             # Volume - editable
             volume_item = QTableWidgetItem(str(slot.volume))
             self.slots_table.setItem(row, 4, volume_item)
+            
+            # Color - read-only (edit via dialog)
+            color_item = QTableWidgetItem(slot.color_name)
+            color_item.setFlags(color_item.flags() & ~Qt.ItemIsEditable)
+            self.slots_table.setItem(row, 5, color_item)
+            
+            # Text Size - read-only (edit via dialog)
+            size_item = QTableWidgetItem(slot.text_size_name)
+            size_item.setFlags(size_item.flags() & ~Qt.ItemIsEditable)
+            self.slots_table.setItem(row, 6, size_item)
         
         self.slots_table.blockSignals(False)
     
@@ -467,22 +477,92 @@ class PcgMainWindow(QMainWindow):
                         self.edit_slot_name(slot)
     
     def edit_slot_name(self, slot):
-        """Edit slot name."""
-        from PySide6.QtWidgets import QInputDialog
+        """Edit slot name, color, and text size."""
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QComboBox, QPushButton, QFormLayout
         
-        new_name, ok = QInputDialog.getText(
-            self,
-            "Edit Slot Name",
-            "Slot Name (max 24 characters):",
-            text=slot.name
-        )
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Edit Slot")
+        dialog.setMinimumWidth(400)
         
-        if ok and new_name:
+        layout = QVBoxLayout()
+        form = QFormLayout()
+        
+        # Name field
+        name_edit = QLineEdit(slot.name)
+        name_edit.setMaxLength(24)
+        form.addRow("Name:", name_edit)
+        
+        # Color selector
+        color_combo = QComboBox()
+        color_options = [
+            ("Default", 0),
+            ("Indigo", 32),
+            ("Burgundy", 140),
+            ("Unknown (204)", 204),
+            ("Unknown (160)", 160),
+            ("Unknown (164)", 164),
+            ("Unknown (148)", 148),
+        ]
+        for color_name, color_value in color_options:
+            color_combo.addItem(color_name, color_value)
+        
+        # Set current color
+        current_index = 0
+        for i, (_, value) in enumerate(color_options):
+            if value == slot.color:
+                current_index = i
+                break
+        color_combo.setCurrentIndex(current_index)
+        form.addRow("Color:", color_combo)
+        
+        # Text size selector
+        size_combo = QComboBox()
+        size_options = [
+            ("XS (Extra Small)", 0),  # Placeholder
+            ("S (Small)", 0),  # Placeholder
+            ("M (Medium)", 0),
+            ("L (Large)", 0),  # Placeholder
+            ("XL (Extra Large)", 16),
+        ]
+        for size_name, size_value in size_options:
+            size_combo.addItem(size_name, size_value)
+        
+        # Set current size
+        current_index = 2  # Default to M
+        if slot.text_size == 16:
+            current_index = 4  # XL
+        elif slot.text_size == 0:
+            current_index = 2  # M
+        size_combo.setCurrentIndex(current_index)
+        form.addRow("Text Size:", size_combo)
+        
+        layout.addLayout(form)
+        
+        # Buttons
+        button_layout = QHBoxLayout()
+        ok_button = QPushButton("OK")
+        cancel_button = QPushButton("Cancel")
+        
+        ok_button.clicked.connect(dialog.accept)
+        cancel_button.clicked.connect(dialog.reject)
+        
+        button_layout.addStretch()
+        button_layout.addWidget(ok_button)
+        button_layout.addWidget(cancel_button)
+        
+        layout.addLayout(button_layout)
+        dialog.setLayout(layout)
+        
+        if dialog.exec() == QDialog.Accepted:
+            new_name = name_edit.text()
             if len(new_name) > 24:
                 QMessageBox.warning(self, "Warning", "Name too long. Maximum 24 characters.")
                 return
             
             slot.name = new_name
+            slot.color = color_combo.currentData()
+            slot.text_size = size_combo.currentData()
+            
             self.mark_dirty()
             self.load_setlist_slots()
     
