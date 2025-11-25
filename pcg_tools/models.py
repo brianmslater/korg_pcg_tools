@@ -22,12 +22,18 @@ class WorkstationModel(Enum):
 
 
 class SlotTextSize(Enum):
-    """Setlist slot text size options."""
-    XS = 1   # Extra Small (estimated)
-    S = 4    # Small (estimated)
-    M = 0    # Medium (confirmed)
-    L = 8    # Large (estimated)
-    XL = 16  # Extra Large (confirmed)
+    """Setlist slot text size options.
+    
+    Based on C# PCG Tools implementation.
+    Values are 3-bit fields split across two bytes:
+    - MSB (1 bit): Byte +29, bit 4
+    - LSB (2 bits): Byte +24, bits 7-6
+    """
+    S = 0    # Small
+    XS = 1   # Extra Small
+    M = 2    # Medium (default)
+    L = 3    # Large
+    XL = 4   # Extra Large
 
 
 # Complete Kronos setlist slot colors (all 16 official colors)
@@ -171,7 +177,8 @@ class SetListSlot:
     volume: int = 127
     hold: bool = False
     color: int = 0  # Color value (byte from STL1/SBK1 at +24)
-    text_size: int = 0  # Text size value (byte from STL1/SBK1 at +29)
+    raw_data: Optional[bytearray] = None  # Raw slot data for bit-level operations
+    _text_size: int = 2  # Internal storage, default to M (2)
     
     @property
     def id(self) -> str:
@@ -191,14 +198,49 @@ class SetListSlot:
         return SLOT_COLORS.get(self.color, f"Unknown({self.color})")
     
     @property
+    def text_size(self) -> SlotTextSize:
+        """Get text size from split bit fields.
+        
+        Text size is stored as 3 bits split across two bytes:
+        - MSB (1 bit): Byte +29, bit 4
+        - LSB (2 bits): Byte +24, bits 7-6
+        
+        Returns:
+            SlotTextSize enum value
+        """
+        if self.raw_data and len(self.raw_data) >= 30:
+            from .bit_utils import get_bits
+            # MSB (1 bit): Byte +29, bit 4
+            msb = get_bits(self.raw_data, 29, 4, 4)
+            # LSB (2 bits): Byte +24, bits 7-6
+            lsb = get_bits(self.raw_data, 24, 7, 6)
+            value = (msb << 2) | lsb
+            try:
+                return SlotTextSize(value)
+            except ValueError:
+                return SlotTextSize.M  # Default to Medium
+        return SlotTextSize(self._text_size)
+    
+    @text_size.setter
+    def text_size(self, size: SlotTextSize) -> None:
+        """Set text size in split bit fields.
+        
+        Args:
+            size: SlotTextSize enum value
+        """
+        self._text_size = size.value
+        if self.raw_data and len(self.raw_data) >= 30:
+            from .bit_utils import set_bits
+            value = size.value
+            # MSB (1 bit) -> byte +29, bit 4
+            set_bits(self.raw_data, 29, 4, 4, (value >> 2) & 0x01)
+            # LSB (2 bits) -> byte +24, bits 7-6
+            set_bits(self.raw_data, 24, 7, 6, value & 0x03)
+    
+    @property
     def text_size_name(self) -> str:
         """Return human-readable text size name."""
-        if self.text_size == 0:
-            return "M"
-        elif self.text_size == 16:
-            return "XL"
-        else:
-            return f"Unknown({self.text_size})"
+        return self.text_size.name
 
 
 @dataclass
