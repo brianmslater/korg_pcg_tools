@@ -168,7 +168,7 @@ class SetListSlot:
     set_list_index: int
     slot_index: int
     name: str
-    description: str = ""
+    _description: str = ""  # Internal storage
     notes: str = ""  # User notes for the slot
     patch_type: str = ""  # "Program" or "Combi"
     patch_bank: str = ""
@@ -367,6 +367,49 @@ class SetListSlot:
             set_bits(self.raw_data, 25, 7, 5, (unsigned >> 3) & 0x07)
             # LSB (3 bits) -> byte +29, bits 7-5
             set_bits(self.raw_data, 29, 7, 5, unsigned & 0x07)
+    
+    @property
+    def description(self) -> str:
+        """Get description from raw data.
+        
+        Description is stored at byte +30, max 512 characters.
+        Supports multi-line text with \\r\\n.
+        
+        Returns:
+            Description string
+        """
+        if self.raw_data and len(self.raw_data) >= 542:  # 30 + 512
+            # Read description bytes
+            desc_bytes = bytes(self.raw_data[30:542])
+            # Find null terminator
+            null_pos = desc_bytes.find(b'\x00')
+            if null_pos >= 0:
+                desc_bytes = desc_bytes[:null_pos]
+            # Decode to string
+            try:
+                return desc_bytes.decode('ascii', errors='ignore')
+            except:
+                return ""
+        return self._description
+    
+    @description.setter
+    def description(self, value: str) -> None:
+        """Set description in raw data.
+        
+        Args:
+            value: Description string (max 512 characters)
+        """
+        # Truncate to 512 chars
+        value = value[:512]
+        self._description = value
+        
+        if self.raw_data and len(self.raw_data) >= 542:
+            # Convert to bytes
+            desc_bytes = value.encode('ascii', errors='ignore')
+            # Pad with nulls to 512 bytes
+            desc_bytes = desc_bytes.ljust(512, b'\x00')
+            # Write to raw data
+            self.raw_data[30:542] = desc_bytes
 
 
 @dataclass
