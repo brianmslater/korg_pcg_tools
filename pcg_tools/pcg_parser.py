@@ -1124,6 +1124,31 @@ class PcgBinaryParser:
             # Text size at +29 from slot name start  
             text_size = self.data[current_offset + 29] if current_offset + 29 < len(self.data) else 0
             
+            # Patch reference at +25 (bank) and +26 (index) from name start
+            patch_bank = ""
+            patch_index = 0
+            patch_type = ""
+            volume = 127
+            
+            if current_offset + 28 < len(self.data):
+                bank_byte = self.data[current_offset + 25]
+                index_byte = self.data[current_offset + 26]
+                volume = self.data[current_offset + 28]
+                
+                # Decode bank (0-7 = I-A through I-H, 0x20+ = User banks)
+                if bank_byte < 8:
+                    patch_bank = f"I-{chr(65 + bank_byte)}"
+                    patch_type = "Program"  # Internal banks are programs
+                elif bank_byte >= 0x20:
+                    user_idx = bank_byte - 0x20
+                    if user_idx < 8:
+                        patch_bank = f"U-{chr(65 + user_idx)}"
+                    else:
+                        patch_bank = f"U-{user_idx}"
+                    patch_type = "Program"
+                
+                patch_index = index_byte
+            
             # Find or create slot
             slot = None
             for s in existing_setlist.slots:
@@ -1138,7 +1163,11 @@ class PcgBinaryParser:
                     slot_index=slot_idx,
                     name=slot_name,
                     color=color,
-                    text_size=text_size
+                    text_size=text_size,
+                    patch_type=patch_type,
+                    patch_bank=patch_bank,
+                    patch_index=patch_index,
+                    volume=volume
                 )
                 existing_setlist.slots.append(slot)
             elif slot:
@@ -1147,6 +1176,11 @@ class PcgBinaryParser:
                     slot.name = slot_name
                 slot.color = color
                 slot.text_size = text_size
+                if patch_type:
+                    slot.patch_type = patch_type
+                    slot.patch_bank = patch_bank
+                    slot.patch_index = patch_index
+                    slot.volume = volume
             
             if slot_name:
                 debug_print(f"Slot {slot_idx}: '{slot_name}' color={color} size={text_size}")
