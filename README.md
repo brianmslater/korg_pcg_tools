@@ -9,25 +9,29 @@
 
 ---
 
-## 🎉 Status: 100% Complete - Perfect!
+## 🎉 Status: Production Ready
 
-All features have been implemented, tested, and verified. The application is **production-ready** and ready for daily use.
+All core features have been implemented, tested, and verified on hardware. The application is **ready for daily use**.
 
-**New in v2.2.0**:
-- ✅ Window position persistence
-- ✅ Find dialog (Ctrl+F)
-- ✅ Change case operations
-- ✅ Complete drag-and-drop
-
-**v2.1.0 Features**:
-- ✅ Undo/Redo support (Ctrl+Z / Ctrl+Y)
-- ✅ Set list editing
-- ✅ Revert to saved
-- ✅ Enhanced UI features
+**Latest Updates**:
+- ✅ **Simple Setlist Editor** - Hardware-tested GUI for setlist editing (v1.1)
+- ✅ Repository cleanup - Professional structure
+- ✅ Complete setlist support - All 16 setlists with 128 slots each
+- ✅ Working PCG writer - Confirmed on Korg Kronos hardware
+- ✅ Full slot editing - Names, colors, transpose, volume, notes
 
 ---
 
 ## ✨ Features
+
+### Setlist Editing (NEW!)
+- ✅ **Simple Setlist Editor** - Clean, reliable GUI for setlist editing
+- ✅ **Hardware tested** - Confirmed working on Korg Kronos
+- ✅ **Edit setlist names** - All 16 setlists supported
+- ✅ **Edit slot properties** - Names, colors, text sizes, transpose, volume, notes
+- ✅ **Recent files** - Quick access to last 10 files
+- ✅ **Window memory** - Remembers position and size
+- ✅ **Keyboard shortcuts** - Ctrl+O, Ctrl+S, and more
 
 ### Core Functionality
 - ✅ **Open and save** PCG files from all Korg synthesizers
@@ -36,35 +40,46 @@ All features have been implemented, tested, and verified. The application is **p
 - ✅ **Move, sort, and organize** your patches
 - ✅ **Generate reports** on program usage and combi content
 - ✅ **Export** to CSV and TXT formats
-- ✅ **Multiple windows** for working with several files simultaneously
+- ✅ **Command-line interface** for automation and batch processing
 
 ### User Interface
-- ✅ **Full GUI** with context menus and keyboard shortcuts
-- ✅ **Command-line interface** for automation and batch processing
-- ✅ **Cross-platform** - works on Windows, macOS, and Linux
+- ✅ **Simple Setlist Editor** - Recommended for setlist editing
+- ✅ **Command-line tools** - Full API access via CLI
+- ✅ **Cross-platform** - Works on Windows, macOS, and Linux
 
 ---
 
 ## 🚀 Quick Start
 
-### Launch GUI
+### Simple Setlist Editor (Recommended)
 ```bash
-cd pcg_tools_python
-python -m pcg_tools gui
+cd korg_pcg_tools
+./edit-setlists
 ```
 
-Or on Windows, double-click: `launch_gui.bat`
+Or:
+```bash
+python3 simple_setlist_editor.py
+```
 
-### CLI Examples
+**Features:**
+- Edit setlist and slot names
+- Change colors and text sizes
+- Adjust transpose and volume
+- Hardware-tested and working!
+
+See [SIMPLE_EDITOR_GUIDE.md](SIMPLE_EDITOR_GUIDE.md) for details.
+
+### Command-Line Interface
 ```bash
 # Show file information
-python -m pcg_tools info yourfile.pcg
+python -m pcg_tools info yourfile.PCG
 
 # Export patch list
-python -m pcg_tools export yourfile.pcg output.csv
+python -m pcg_tools export yourfile.PCG output.csv
 
 # Generate program usage report
-python -m pcg_tools program-usage yourfile.pcg usage.csv
+python -m pcg_tools program-usage yourfile.PCG usage.csv
 
 # See all commands
 python -m pcg_tools --help
@@ -97,44 +112,43 @@ That's it! No other dependencies required.
 ## 📖 Documentation
 
 ### Getting Started
+- **[SIMPLE_EDITOR_GUIDE.md](SIMPLE_EDITOR_GUIDE.md)** - Simple Setlist Editor guide (start here!)
 - **[QUICKSTART.md](QUICKSTART.md)** - Get up and running in 5 minutes
+- **[INSTALL.md](INSTALL.md)** - Installation instructions for all platforms
 - **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Quick reference card
-- **[START_HERE_WINDOWS.txt](START_HERE_WINDOWS.txt)** - Windows-specific guide
 
 ### User Guides
 - **[USAGE.md](USAGE.md)** - Detailed usage instructions
+- **[KNOWN_ISSUES.md](KNOWN_ISSUES.md)** - Known limitations and workarounds
 
 ### Technical Documentation
-- **[FEATURE_COMPARISON.md](FEATURE_COMPARISON.md)** - Feature comparison with original
-- **[TECHNICAL_REFERENCE.md](TECHNICAL_REFERENCE.md)** - PCG file format and implementation details
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Developer guide and project structure
+- **[docs/TECHNICAL_REFERENCE.md](docs/TECHNICAL_REFERENCE.md)** - PCG file format details
+- **[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)** - Repository organization
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Developer guide
+- **[CHANGELOG.md](CHANGELOG.md)** - Version history
 
 ---
 
-## ⌨️ Keyboard Shortcuts
+## ⌨️ Keyboard Shortcuts (Simple Setlist Editor)
 
 | Shortcut | Action |
 |----------|--------|
 | **Ctrl+O** | Open PCG file |
-| **Ctrl+N** | New window |
 | **Ctrl+S** | Save file |
-| **Ctrl+C** | Copy patches |
-| **Ctrl+X** | Cut patches |
-| **Ctrl+V** | Paste patches |
-| **Delete** | Clear patches |
-| **Double-click** | Edit patch |
+| **Ctrl+Shift+S** | Save As |
+| **Ctrl+Q** | Quit |
+| **Double-click** | Edit slot |
+| **Return** | Edit selected slot |
+| **Right-click** | Context menu |
 
 ---
 
-## 🖱️ Context Menu
+## 🖱️ Context Menu (Simple Setlist Editor)
 
-Right-click on any patch to access:
-- Edit patch properties
-- Copy/Cut/Paste
-- Move up/down
-- Sort patches
-- Compact bank
-- Clear patch
+Right-click on any slot to access:
+- Edit Slot
+- Clear Slot
+- Copy Slot Name
 
 ---
 
@@ -167,115 +181,138 @@ python -m pcg_tools export file.pcg output.txt --format txt
 
 ## 🎯 Common Tasks
 
-### Edit a Patch
-1. Double-click the patch
-2. Edit name (max 24 characters)
-3. Select category
-4. Toggle favorite
-5. Click OK
+### Edit Setlist Names
+1. Launch Simple Setlist Editor: `./edit-setlists`
+2. Open your PCG file
+3. Select a setlist from dropdown
+4. Click "Edit Setlist Name"
+5. Save the file
 
-### Copy Patches Between Files
-1. Open both files (File → Open PCG...)
-2. Select patches in source file
-3. Press Ctrl+C
-4. Switch to destination file
-5. Select destination slot
-6. Press Ctrl+V
+### Edit Slot Properties
+1. Double-click any slot in the table
+2. Edit name, color, text size, transpose, volume, or notes
+3. Click "Save"
+4. Save the file when done
 
-### Generate Usage Report
+### Generate Reports
 ```bash
-python -m pcg_tools program-usage yourfile.pcg usage.csv
+# Program usage report
+python -m pcg_tools program-usage yourfile.PCG usage.csv
+
+# Combi content report
+python -m pcg_tools combi-content yourfile.PCG content.csv
+
+# Export patch list
+python -m pcg_tools export yourfile.PCG patches.csv
 ```
 
 ---
 
 ## 🌟 Advantages Over Original
 
-| Feature | Original | Python Port |
-|---------|----------|-------------|
+| Feature | Original C# | Python Port |
+|---------|-------------|-------------|
 | **Platform** | Windows only | Cross-platform |
 | **Framework** | .NET Framework | Pure Python |
-| **Size** | 5+ MB | < 1 MB |
-| **CLI** | Limited | 7 commands |
+| **Setlist Editing** | Complex | Simple & reliable |
+| **Hardware Tested** | Unknown | ✅ Confirmed working |
+| **CLI** | Limited | Full API access |
 | **Library** | No | Yes |
-| **Open Source** | No | Yes |
+| **Open Source** | No | Yes (MIT) |
 
 ---
 
-## 🧪 Testing
+## 🧪 Hardware Testing
 
-Run the comprehensive test suite:
-```bash
-python test_complete.py
-```
+The Simple Setlist Editor has been extensively tested on **Korg Kronos hardware**:
 
-All tests should pass:
-```
-✅ TEST 1: BASIC FILE OPERATIONS - PASSED
-✅ TEST 2: CLIPBOARD OPERATIONS - PASSED
-✅ TEST 3: PATCH OPERATIONS - PASSED
-✅ TEST 4: LIST GENERATORS - PASSED
-✅ TEST 5: EDIT OPERATIONS - PASSED
-✅ TEST 6: FILE WRITING - PASSED
-```
+✅ **Setlist name editing** - Works perfectly
+✅ **Slot name editing** - Works perfectly  
+✅ **Color changes** - Display correctly on hardware
+✅ **Text size changes** - Display correctly on hardware
+✅ **Transpose settings** - Function correctly
+✅ **Volume settings** - Function correctly
+✅ **File integrity** - Files load without errors
+
+**Test files created and verified on actual Kronos hardware.**
 
 ---
 
 ## 📁 Project Structure
 
 ```
-pcg_tools_python/
-├── pcg_tools/              # Main package
-│   ├── __init__.py
-│   ├── __main__.py
-│   ├── models.py           # Data structures
-│   ├── reader.py           # PCG file parser
-│   ├── writer.py           # PCG file writer
-│   ├── pcg_parser.py       # Binary parser
-│   ├── clipboard.py        # Copy/paste logic
-│   ├── operations.py       # Patch management
-│   ├── edit_dialog.py      # Edit interface
-│   ├── list_generators.py  # Report generation
-│   ├── gui.py              # GUI implementation
-│   └── cli.py              # CLI implementation
-├── test_complete.py        # Test suite
-├── launch_gui.bat          # Windows launcher
-└── README.md               # This file
+korg_pcg_tools/
+├── README.md                    # This file
+├── INSTALL.md                   # Installation guide
+├── SIMPLE_EDITOR_GUIDE.md       # Setlist editor guide
+├── simple_setlist_editor.py     # Setlist editor (recommended!)
+├── edit-setlists                # Launcher script
+│
+├── pcg_tools/                   # Main package
+│   ├── models.py                # Data structures
+│   ├── pcg_parser.py            # PCG file parser
+│   ├── writer.py                # PCG file writer (hardware-tested)
+│   ├── cli.py                   # Command-line interface
+│   ├── bit_utils.py             # Binary utilities
+│   └── ...
+│
+├── docs/                        # Additional documentation
+├── examples/                    # Usage examples
+└── archive/                     # Development scripts (local only)
 ```
+
+See [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) for complete details.
 
 ---
 
 ## 🐛 Troubleshooting
 
-### GUI Won't Launch
+### Simple Setlist Editor Won't Launch
 ```bash
 # Check Python installation
-python --version
+python3 --version
 
 # Check tkinter
-python -m tkinter
+python3 -m tkinter
 ```
+
+If tkinter is missing:
+- **macOS**: `brew install python-tk@3.12`
+- **Ubuntu/Debian**: `sudo apt install python3-tk`
+- **Windows**: Reinstall Python with tkinter option
 
 ### File Won't Open
 - Verify file is a valid PCG format
 - Check file isn't corrupted
 - Try with a different file
 
-### Can't Paste
-- Ensure clipboard has content
-- Select a destination slot
-- Check file is loaded
+### File Won't Load on Kronos
+- This shouldn't happen with Simple Setlist Editor!
+- If it does, please report the issue with your PCG file
+
+See [KNOWN_ISSUES.md](KNOWN_ISSUES.md) for more details.
 
 ---
 
 ## 🤝 Contributing
 
-This is a complete, working implementation. Future enhancements could include:
-- Set list UI
-- Drag and drop between windows
-- Undo/redo support
-- More export formats
-- Theme support
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+### Areas for Enhancement
+- Patch reference editing in Simple Setlist Editor
+- Batch operations (apply settings to multiple slots)
+- Undo/redo in Simple Setlist Editor
+- Fix main GUI writer issues
+- Additional export formats
+- More automation examples
+
+### Development
+```bash
+git clone https://github.com/yourusername/korg-pcg-tools.git
+cd korg-pcg-tools
+pip install -r requirements.txt
+python3 simple_setlist_editor.py
+```
 
 ---
 
@@ -298,20 +335,21 @@ Inspired by the original PCG Tools by Michel Keijzers.
 ## 📞 Support
 
 For help:
-1. Check the [QUICKSTART.md](QUICKSTART.md) guide
-2. Run `python -m pcg_tools --help`
-3. Review [QUICK_REFERENCE.md](QUICK_REFERENCE.md)
-4. See [USAGE.md](USAGE.md) for detailed instructions
+1. Check the [SIMPLE_EDITOR_GUIDE.md](SIMPLE_EDITOR_GUIDE.md) for setlist editing
+2. See [INSTALL.md](INSTALL.md) for installation issues
+3. Review [KNOWN_ISSUES.md](KNOWN_ISSUES.md) for limitations
+4. Check [USAGE.md](USAGE.md) for CLI commands
+5. Open an issue on GitHub for bugs or questions
 
 ---
 
 ## 🎊 Status
 
-**Version:** 2.2.0  
-**Date:** November 16, 2025  
+**Version:** 1.1.0  
+**Date:** November 26, 2025  
 **Status:** ✅ Production Ready  
-**Quality:** ⭐⭐⭐⭐⭐  
-**Completion:** 100%  
+**Hardware Tested:** ✅ Korg Kronos  
+**Recommended Tool:** Simple Setlist Editor  
 
 ---
 
