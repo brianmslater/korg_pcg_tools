@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-Simple Setlist Name Editor
-A clean, focused GUI for editing PCG setlist names.
+Simple Setlist Editor
+A clean, reliable GUI for editing PCG setlists and slots.
 Uses the working writer code directly - no extra modifications.
+Hardware tested and confirmed working on Korg Kronos.
 """
 
 import tkinter as tk
@@ -10,15 +11,17 @@ from tkinter import ttk, filedialog, messagebox
 from pathlib import Path
 from pcg_tools.reader import read_pcg_file
 from pcg_tools.writer import write_pcg_file
+from pcg_tools.models import SLOT_COLOR_VALUES, SlotTextSize
 
 class SimpleSetlistEditor:
     def __init__(self, root):
         self.root = root
-        self.root.title("Simple Setlist Name Editor")
-        self.root.geometry("600x500")
+        self.root.title("Simple Setlist Editor")
+        self.root.geometry("900x700")
         
         self.pcg = None
         self.current_file = None
+        self.current_setlist = None
         
         self.setup_ui()
     
@@ -50,30 +53,62 @@ class SimpleSetlistEditor:
         # Separator
         ttk.Separator(main_frame, orient='horizontal').grid(row=1, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=10)
         
-        # Setlist editor
-        ttk.Label(main_frame, text="Setlists:").grid(row=2, column=0, sticky=(tk.W, tk.N), pady=(0, 5))
+        # Setlist selector
+        ttk.Label(main_frame, text="Setlist:").grid(row=2, column=0, sticky=tk.W, pady=(0, 5))
         
-        # Setlist listbox with scrollbar
-        list_frame = ttk.Frame(main_frame)
-        list_frame.grid(row=2, column=1, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
-        list_frame.columnconfigure(0, weight=1)
-        list_frame.rowconfigure(0, weight=1)
+        setlist_select_frame = ttk.Frame(main_frame)
+        setlist_select_frame.grid(row=2, column=1, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5))
+        setlist_select_frame.columnconfigure(0, weight=1)
         
-        self.setlist_listbox = tk.Listbox(list_frame, height=15)
-        self.setlist_listbox.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        self.setlist_listbox.bind('<Double-Button-1>', self.edit_selected)
+        self.setlist_combo = ttk.Combobox(setlist_select_frame, state='readonly')
+        self.setlist_combo.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 10))
+        self.setlist_combo.bind('<<ComboboxSelected>>', self.on_setlist_selected)
         
-        scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=self.setlist_listbox.yview)
-        scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
-        self.setlist_listbox.configure(yscrollcommand=scrollbar.set)
+        ttk.Button(setlist_select_frame, text="Edit Setlist Name", command=self.edit_setlist_name).grid(row=0, column=1)
+        
+        # Slots table
+        ttk.Label(main_frame, text="Slots:").grid(row=3, column=0, sticky=(tk.W, tk.N), pady=(10, 5))
+        
+        # Create table frame
+        table_frame = ttk.Frame(main_frame)
+        table_frame.grid(row=3, column=1, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(10, 10))
+        table_frame.columnconfigure(0, weight=1)
+        table_frame.rowconfigure(0, weight=1)
+        
+        # Create Treeview for slots
+        columns = ('slot', 'name', 'color', 'size', 'transpose', 'volume')
+        self.slots_tree = ttk.Treeview(table_frame, columns=columns, show='headings', height=15)
+        
+        # Define column headings and widths
+        self.slots_tree.heading('slot', text='#')
+        self.slots_tree.heading('name', text='Slot Name')
+        self.slots_tree.heading('color', text='Color')
+        self.slots_tree.heading('size', text='Size')
+        self.slots_tree.heading('transpose', text='Transpose')
+        self.slots_tree.heading('volume', text='Volume')
+        
+        self.slots_tree.column('slot', width=40, anchor=tk.CENTER)
+        self.slots_tree.column('name', width=300, anchor=tk.W)
+        self.slots_tree.column('color', width=100, anchor=tk.CENTER)
+        self.slots_tree.column('size', width=60, anchor=tk.CENTER)
+        self.slots_tree.column('transpose', width=80, anchor=tk.CENTER)
+        self.slots_tree.column('volume', width=80, anchor=tk.CENTER)
+        
+        self.slots_tree.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        self.slots_tree.bind('<Double-Button-1>', self.edit_slot)
+        
+        # Scrollbar for table
+        tree_scroll = ttk.Scrollbar(table_frame, orient="vertical", command=self.slots_tree.yview)
+        tree_scroll.grid(row=0, column=1, sticky=(tk.N, tk.S))
+        self.slots_tree.configure(yscrollcommand=tree_scroll.set)
         
         # Buttons
         button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=2, column=2, sticky=(tk.N), padx=(10, 0))
+        button_frame.grid(row=4, column=1, columnspan=2, sticky=(tk.E), pady=(10, 0))
         
-        ttk.Button(button_frame, text="Edit Name", command=self.edit_selected).pack(pady=(0, 5), fill=tk.X)
-        ttk.Button(button_frame, text="Save File", command=self.save_file).pack(pady=(0, 5), fill=tk.X)
-        ttk.Button(button_frame, text="Save As...", command=self.save_as_file).pack(fill=tk.X)
+        ttk.Button(button_frame, text="Edit Slot", command=self.edit_slot).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(button_frame, text="Save File", command=self.save_file).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(button_frame, text="Save As...", command=self.save_as_file).pack(side=tk.LEFT)
         
         # Status bar
         ttk.Separator(main_frame, orient='horizontal').grid(row=3, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(10, 5))
@@ -111,45 +146,70 @@ class SimpleSetlistEditor:
             self.status_label.config(text="Error loading file", foreground="red")
     
     def update_setlist_display(self):
-        """Update the setlist display."""
-        self.setlist_listbox.delete(0, tk.END)
+        """Update the setlist combo box."""
+        self.setlist_combo['values'] = []
         
         if self.pcg and self.pcg.set_lists:
-            for i, setlist in enumerate(self.pcg.set_lists):
-                name = setlist.name if setlist.name else "(Empty)"
-                self.setlist_listbox.insert(tk.END, f"{i+1:2d}. {name}")
+            setlist_names = [f"{i+1}. {sl.name or '(Empty)'}" for i, sl in enumerate(self.pcg.set_lists)]
+            self.setlist_combo['values'] = setlist_names
+            if setlist_names:
+                self.setlist_combo.current(0)
+                self.on_setlist_selected()
     
-    def edit_selected(self, event=None):
-        """Edit the selected setlist name."""
-        if not self.pcg:
-            messagebox.showwarning("No File", "Please load a PCG file first.")
+    def on_setlist_selected(self, event=None):
+        """Handle setlist selection change."""
+        if not self.pcg or not self.pcg.set_lists:
             return
         
-        selection = self.setlist_listbox.curselection()
-        if not selection:
-            messagebox.showwarning("No Selection", "Please select a setlist to edit.")
+        idx = self.setlist_combo.current()
+        if idx >= 0:
+            self.current_setlist = self.pcg.set_lists[idx]
+            self.update_slots_display()
+    
+    def update_slots_display(self):
+        """Update the slots table."""
+        # Clear existing items
+        for item in self.slots_tree.get_children():
+            self.slots_tree.delete(item)
+        
+        if not self.current_setlist or not self.current_setlist.slots:
             return
         
-        index = selection[0]
-        setlist = self.pcg.set_lists[index]
+        # Add slots to table
+        for slot in self.current_setlist.slots:
+            values = (
+                str(slot.slot_index + 1),
+                slot.name or "(Empty)",
+                slot.color_name,
+                slot.text_size_name,
+                f"{slot.transpose:+d}" if slot.transpose != 0 else "0",
+                str(slot.volume)
+            )
+            self.slots_tree.insert('', tk.END, values=values, tags=(str(slot.slot_index),))
+    
+    def edit_setlist_name(self):
+        """Edit the current setlist name."""
+        if not self.current_setlist:
+            messagebox.showwarning("No Setlist", "Please select a setlist first.")
+            return
         
         # Create edit dialog
         dialog = tk.Toplevel(self.root)
-        dialog.title(f"Edit Setlist {index + 1}")
-        dialog.geometry("400x150")
+        dialog.title(f"Edit Setlist Name")
+        dialog.geometry("400x120")
         dialog.transient(self.root)
         dialog.grab_set()
         
         # Center the dialog
-        dialog.geometry("+%d+%d" % (self.root.winfo_rootx() + 50, self.root.winfo_rooty() + 50))
+        dialog.geometry("+%d+%d" % (self.root.winfo_rootx() + 250, self.root.winfo_rooty() + 200))
         
         # Dialog content
         frame = ttk.Frame(dialog, padding="20")
         frame.pack(fill=tk.BOTH, expand=True)
         
-        ttk.Label(frame, text=f"Setlist {index + 1} Name:").pack(anchor=tk.W, pady=(0, 5))
+        ttk.Label(frame, text="Setlist Name:").pack(anchor=tk.W, pady=(0, 5))
         
-        name_var = tk.StringVar(value=setlist.name or "")
+        name_var = tk.StringVar(value=self.current_setlist.name or "")
         entry = ttk.Entry(frame, textvariable=name_var, width=40)
         entry.pack(fill=tk.X, pady=(0, 10))
         entry.focus()
@@ -165,9 +225,9 @@ class SimpleSetlistEditor:
                 messagebox.showwarning("Name Too Long", "Setlist names must be 24 characters or less.")
                 return
             
-            setlist.name = new_name
+            self.current_setlist.name = new_name
             self.update_setlist_display()
-            self.status_label.config(text=f"Updated setlist {index + 1} name", foreground="blue")
+            self.status_label.config(text=f"Updated setlist name", foreground="blue")
             dialog.destroy()
         
         def cancel():
@@ -176,8 +236,115 @@ class SimpleSetlistEditor:
         ttk.Button(button_frame, text="Save", command=save_name).pack(side=tk.RIGHT, padx=(5, 0))
         ttk.Button(button_frame, text="Cancel", command=cancel).pack(side=tk.RIGHT)
         
-        # Bind Enter key
+        # Bind keys
         entry.bind('<Return>', lambda e: save_name())
+        dialog.bind('<Escape>', lambda e: cancel())
+    
+    def edit_slot(self, event=None):
+        """Edit the selected slot."""
+        if not self.current_setlist:
+            messagebox.showwarning("No Setlist", "Please select a setlist first.")
+            return
+        
+        selection = self.slots_tree.selection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select a slot to edit.")
+            return
+        
+        # Get slot index from tags
+        item = selection[0]
+        tags = self.slots_tree.item(item, 'tags')
+        if not tags:
+            return
+        
+        slot_idx = int(tags[0])
+        slot = self.current_setlist.slots[slot_idx]
+        
+        # Create edit dialog
+        dialog = tk.Toplevel(self.root)
+        dialog.title(f"Edit Slot {slot_idx + 1}")
+        dialog.geometry("450x350")
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        # Center the dialog
+        dialog.geometry("+%d+%d" % (self.root.winfo_rootx() + 225, self.root.winfo_rooty() + 175))
+        
+        # Dialog content
+        frame = ttk.Frame(dialog, padding="20")
+        frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Slot name
+        ttk.Label(frame, text="Slot Name:").grid(row=0, column=0, sticky=tk.W, pady=(0, 5))
+        name_var = tk.StringVar(value=slot.name or "")
+        name_entry = ttk.Entry(frame, textvariable=name_var, width=40)
+        name_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), pady=(0, 5))
+        name_entry.focus()
+        
+        # Color
+        ttk.Label(frame, text="Color:").grid(row=1, column=0, sticky=tk.W, pady=(0, 5))
+        color_var = tk.StringVar(value=slot.color_name)
+        color_combo = ttk.Combobox(frame, textvariable=color_var, state='readonly', width=37)
+        color_combo['values'] = sorted(SLOT_COLOR_VALUES.keys())
+        color_combo.grid(row=1, column=1, sticky=(tk.W, tk.E), pady=(0, 5))
+        
+        # Text Size
+        ttk.Label(frame, text="Text Size:").grid(row=2, column=0, sticky=tk.W, pady=(0, 5))
+        size_var = tk.StringVar(value=slot.text_size_name)
+        size_combo = ttk.Combobox(frame, textvariable=size_var, state='readonly', width=37)
+        size_combo['values'] = ['XS', 'S', 'M', 'L', 'XL']
+        size_combo.grid(row=2, column=1, sticky=(tk.W, tk.E), pady=(0, 5))
+        
+        # Transpose
+        ttk.Label(frame, text="Transpose:").grid(row=3, column=0, sticky=tk.W, pady=(0, 5))
+        transpose_var = tk.IntVar(value=slot.transpose)
+        transpose_spin = ttk.Spinbox(frame, from_=-24, to=24, textvariable=transpose_var, width=38)
+        transpose_spin.grid(row=3, column=1, sticky=(tk.W, tk.E), pady=(0, 5))
+        
+        # Volume
+        ttk.Label(frame, text="Volume:").grid(row=4, column=0, sticky=tk.W, pady=(0, 5))
+        volume_var = tk.IntVar(value=slot.volume)
+        volume_spin = ttk.Spinbox(frame, from_=0, to=127, textvariable=volume_var, width=38)
+        volume_spin.grid(row=4, column=1, sticky=(tk.W, tk.E), pady=(0, 5))
+        
+        # Notes
+        ttk.Label(frame, text="Notes:").grid(row=5, column=0, sticky=(tk.W, tk.N), pady=(10, 5))
+        notes_text = tk.Text(frame, height=5, width=40)
+        notes_text.grid(row=5, column=1, sticky=(tk.W, tk.E), pady=(10, 10))
+        notes_text.insert('1.0', slot.notes or "")
+        
+        frame.columnconfigure(1, weight=1)
+        
+        # Buttons
+        button_frame = ttk.Frame(frame)
+        button_frame.grid(row=6, column=0, columnspan=2, sticky=(tk.E), pady=(10, 0))
+        
+        def save_slot():
+            # Validate name length
+            new_name = name_var.get().strip()
+            if len(new_name) > 24:
+                messagebox.showwarning("Name Too Long", "Slot names must be 24 characters or less.")
+                return
+            
+            # Update slot
+            slot.name = new_name
+            slot.color = SLOT_COLOR_VALUES[color_var.get()]
+            slot.text_size = SlotTextSize[size_var.get()]
+            slot.transpose = transpose_var.get()
+            slot.volume = volume_var.get()
+            slot.notes = notes_text.get('1.0', tk.END).strip()
+            
+            self.update_slots_display()
+            self.status_label.config(text=f"Updated slot {slot_idx + 1}", foreground="blue")
+            dialog.destroy()
+        
+        def cancel():
+            dialog.destroy()
+        
+        ttk.Button(button_frame, text="Save", command=save_slot).pack(side=tk.RIGHT, padx=(5, 0))
+        ttk.Button(button_frame, text="Cancel", command=cancel).pack(side=tk.RIGHT)
+        
+        # Bind Escape key
         dialog.bind('<Escape>', lambda e: cancel())
     
     def save_file(self):

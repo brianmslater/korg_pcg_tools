@@ -48,9 +48,16 @@ test_output/*.txt
 *.sng
 output/
 exports/
+test_files/
+archive/
+dev_notes/
 
-# Keep test files
-!test_files/**/*.pcg
+# macOS resource forks
 ._*
+
+# Virtual environments
 venv_tk/
+
+# PCG files (except examples)
 *.PCG
+!examples/**/*.PCG

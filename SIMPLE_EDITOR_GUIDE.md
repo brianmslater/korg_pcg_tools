@@ -2,12 +2,13 @@
 
 ## What It Is
 
-A clean, focused GUI for editing PCG setlist names that **actually works on hardware**!
+A clean, reliable GUI for editing PCG setlists and slots that **actually works on hardware**!
 
 ## Features
 
 ✅ **Hardware Tested** - Uses the working writer code directly
-✅ **Simple Interface** - Just load, edit, save
+✅ **Full Editing** - Setlist names, slot names, colors, transpose, volume, notes
+✅ **Simple Interface** - Easy to use, no complexity
 ✅ **No Extra Modifications** - Only changes what you edit
 ✅ **Safe** - Doesn't break files like the main GUI
 
@@ -25,23 +26,33 @@ cd korg_pcg_tools
 python3 simple_setlist_editor.py
 ```
 
-### Edit Setlist Names
+### Edit Setlists and Slots
 
 1. **Load File**
    - Click "Browse..." 
    - Select your PCG file
 
-2. **Edit Names**
-   - Double-click a setlist in the list
-   - Or select it and click "Edit Name"
-   - Type the new name (max 24 characters)
-   - Click "Save" or press Enter
+2. **Select Setlist**
+   - Choose a setlist from the dropdown
+   - Click "Edit Setlist Name" to rename it
 
-3. **Save File**
+3. **Edit Slots**
+   - Double-click any slot in the table
+   - Or select it and click "Edit Slot"
+   - Edit any of these properties:
+     - **Name** - Custom slot name (24 chars max)
+     - **Color** - Choose from 16 Kronos colors
+     - **Text Size** - XS, S, M, L, or XL
+     - **Transpose** - -24 to +24 semitones
+     - **Volume** - 0 to 127
+     - **Notes** - Comments/reminders
+   - Click "Save"
+
+4. **Save File**
    - Click "Save File" to overwrite original
    - Or "Save As..." to create a new file
 
-4. **Test on Kronos**
+5. **Test on Kronos**
    - Copy the saved file to USB drive
    - Load on Kronos - it will work! ✅
 
@@ -56,30 +67,34 @@ This editor:
 ## Interface
 
 ```
-┌─ Simple Setlist Name Editor ──────────────────┐
-│                                               │
-│ PCG File: [soundcheck.PCG        ] [Browse...] │
-│ ──────────────────────────────────────────── │
-│                                               │
-│ Setlists:                                     │
-│ ┌─────────────────────────────┐  [Edit Name]  │
-│ │  1. NIGHTWISH LEGACY        │  [Save File]  │
-│ │  2. ULTIMATE COVERS         │  [Save As...] │
-│ │  3. MOVIE & TV THEMES       │               │
-│ │  4. Set List 004            │               │
-│ │  5. Set List 005            │               │
-│ │  ...                        │               │
-│ └─────────────────────────────┘               │
-│                                               │
-│ Status: Ready - Load a PCG file to start     │
-└───────────────────────────────────────────────┘
+┌─ Simple Setlist Editor ────────────────────────────────────────┐
+│                                                                │
+│ PCG File: [soundcheck.PCG              ] [Browse...]          │
+│ ────────────────────────────────────────────────────────────  │
+│                                                                │
+│ Setlist: [1. NIGHTWISH LEGACY ▼] [Edit Setlist Name]         │
+│                                                                │
+│ Slots:                                                         │
+│ ┌──────────────────────────────────────────────────────────┐  │
+│ │ # │ Slot Name           │ Color  │ Size │ Trans │ Vol   │  │
+│ ├───┼────────────────────┼────────┼──────┼───────┼───────┤  │
+│ │ 1 │ K-Lab: Katja's...  │ Azure  │  M   │   0   │  127  │  │
+│ │ 2 │ Nightwish Intro    │ Brick  │  XL  │  +2   │  120  │  │
+│ │ 3 │ Storytime          │ Gold   │  L   │   0   │  127  │  │
+│ │ 4 │ (Empty)            │ Default│  M   │   0   │  127  │  │
+│ │...│                    │        │      │       │       │  │
+│ └──────────────────────────────────────────────────────────┘  │
+│                                                                │
+│                    [Edit Slot] [Save File] [Save As...]       │
+│                                                                │
+│ Status: Ready - Load a PCG file to start                      │
+└────────────────────────────────────────────────────────────────┘
 ```
 
 ## Keyboard Shortcuts
 
-- **Double-click** setlist to edit
-- **Enter** to save name in edit dialog
-- **Escape** to cancel edit
+- **Double-click** slot to edit
+- **Escape** to cancel edit dialog
 
 ## File Safety
 
@@ -87,11 +102,24 @@ This editor:
 - Use "Save As..." to create copies
 - Always test files on hardware before replacing originals
 
+## Editable Properties
+
+### Setlist Level
+- **Name** - Setlist name (24 chars max)
+
+### Slot Level
+- **Name** - Custom slot name (24 chars max)
+- **Color** - 16 official Kronos colors
+- **Text Size** - XS, S, M, L, XL
+- **Transpose** - -24 to +24 semitones
+- **Volume** - 0 to 127
+- **Notes** - Comments and reminders
+
 ## Limitations
 
-- **Setlist names only** - doesn't edit slot names (yet)
-- **24 character limit** - enforced by Kronos format
+- **24 character limit** - enforced by Kronos format for names
 - **ASCII characters only** - special characters may not work
+- **Patch references** - Can't change which patch a slot points to (yet)
 
 ## Troubleshooting
 
@@ -113,17 +141,20 @@ This editor:
 | Feature | Simple Editor | Main GUI |
 |---------|---------------|----------|
 | Setlist names | ✅ Works | ❌ Breaks files |
-| Slot editing | ❌ Not yet | ✅ Full featured |
+| Slot editing | ✅ Works | ❌ Breaks files |
+| Colors & sizes | ✅ Works | ❌ Breaks files |
+| Transpose & volume | ✅ Works | ❌ Breaks files |
 | Hardware compatibility | ✅ Tested | ❌ Files rejected |
-| Interface | Simple | Complex |
+| Interface | Simple & clean | Complex |
 
 ## Future Enhancements
 
 Planned features:
-- Slot name editing
-- Batch rename operations
+- Patch reference editing (change which patch a slot uses)
+- Batch operations (apply color/size to multiple slots)
 - Undo/redo
 - File backup
+- Slot copy/paste
 
 ## Status
 
