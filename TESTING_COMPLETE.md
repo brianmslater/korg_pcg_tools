@@ -8,37 +8,37 @@
 
 ## CLI Testing Results
 
-All CLI commands tested with `soundcheck_HARDWARE_TEST.PCG`:
+All CLI commands tested with `soundcheck9_25_25_combined2.PCG`:
 
 ### ✅ info command
 ```bash
-python3 -m pcg_tools info "test_files/soundcheck_HARDWARE_TEST.PCG"
+python3 -m pcg_tools info "test_files/soundcheck9_25_25_combined2.PCG"
 ```
-**Result**: Displays correct file information (Model: Korg Kronos, Version: 2.2, 128 programs, 128 combis, 16 setlists)
+**Result**: ✅ Displays correct file information (Model: Korg Kronos, Version: 2.2, 128 programs, 128 combis, 16 setlists)
 
 ### ✅ export command
 ```bash
-python3 -m pcg_tools export "test_files/soundcheck_HARDWARE_TEST.PCG" output.csv
+python3 -m pcg_tools export "test_files/soundcheck9_25_25_combined2.PCG" output.csv
 ```
-**Result**: CSV file created with all patches listed correctly
+**Result**: ✅ CSV file created with all 128 programs and 128 combis listed correctly
 
 ### ✅ program-usage command
 ```bash
-python3 -m pcg_tools program-usage "test_files/soundcheck_HARDWARE_TEST.PCG" usage.csv
+python3 -m pcg_tools program-usage "test_files/soundcheck9_25_25_combined2.PCG" usage.csv
 ```
-**Result**: Usage report generated showing which programs are used in combis/setlists
+**Result**: ✅ Usage report generated (129 lines) showing which programs are used in combis/setlists
 
 ### ✅ combi-content command
 ```bash
-python3 -m pcg_tools combi-content "test_files/soundcheck_HARDWARE_TEST.PCG" content.csv
+python3 -m pcg_tools combi-content "test_files/soundcheck9_25_25_combined2.PCG" content.csv
 ```
-**Result**: Combi content report generated showing timbres in each combi
+**Result**: ✅ Combi content report generated (129 lines) showing timbres in each combi
 
 ### ✅ list-patches command
 ```bash
-python3 -m pcg_tools list-patches "test_files/soundcheck_HARDWARE_TEST.PCG"
+python3 -m pcg_tools list-patches "test_files/soundcheck9_25_25_combined2.PCG"
 ```
-**Result**: All patches listed to stdout correctly
+**Result**: ✅ All 128 programs and 128 combis listed to stdout correctly
 
 ### ✅ differences command
 ```bash
