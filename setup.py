@@ -7,7 +7,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="pcg-tools",
-    version="2.2.0",
+    version="1.1.0",
     author="Brian Slater",
     author_email="brian.m.slater@gmail.com",
     description="Cross-platform Korg PCG file editor - Python rewrite of PCG Tools",
