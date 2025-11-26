@@ -5,131 +5,175 @@ All notable changes to PCG Tools Python will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.1.0] - 2025-11-16
+## [1.1.0] - 2025-11-26
 
-### Added - The Final 5%!
-- **Undo/Redo Support**: Full undo/redo with 50-action history (Ctrl+Z / Ctrl+Y)
-- **Set List Editing**: Complete set list slot editing dialog
-- **Set List Properties**: Edit set list names and descriptions
-- **Revert to Saved**: Explicit revert button to discard changes
-- **Enhanced Edit Menu**: Shows undo/redo action descriptions
-- **Undo Manager**: Comprehensive undo system with callbacks
-- **Action Descriptions**: Clear descriptions of what will be undone/redone
+### Added - Simple Setlist Editor
+- **Simple Setlist Editor**: New standalone GUI for setlist editing
+- **Hardware Tested**: Confirmed working on Korg Kronos hardware
+- **Setlist Name Editing**: Edit all 16 setlist names
+- **Slot Editing**: Complete slot property editing
+  - Slot names (24 characters max)
+  - Colors (16 official Kronos colors)
+  - Text sizes (XS, S, M, L, XL)
+  - Transpose (-24 to +24 semitones)
+  - Volume (0-127)
+  - Notes/descriptions
+- **Recent Files**: Quick access to last 10 opened files
+- **Window Memory**: Remembers position and size between sessions
+- **Unsaved Changes Warning**: Prevents accidental data loss
+- **Keyboard Shortcuts**: Ctrl+O, Ctrl+S, Ctrl+Shift+S, Ctrl+Q
+- **Context Menu**: Right-click for quick actions (Edit, Clear, Copy Name)
+- **Slot Counter**: Shows X/128 slots used in status bar
+- **Configuration Persistence**: Settings saved to ~/.pcg_tools_simple_editor.json
 
 ### Improved
-- Edit menu now shows what action will be undone/redone
-- Better keyboard shortcut integration
-- More complete feature parity with original PCG Tools
+- **PCG Writer**: Fixed and confirmed working on hardware
+- **Repository Structure**: Cleaned and organized (205 files moved to archive/dev_notes)
+- **Documentation**: Complete rewrite of README and QUICKSTART
+- **Project Organization**: Added PROJECT_STRUCTURE.md and FEATURE_COMPARISON.md
+
+### Fixed
+- **Writer Bug**: SLS1-only updates now work correctly on hardware
+- **File Integrity**: Files no longer break when saving setlist changes
+- **Setlist Parsing**: All 16 setlists with 128 slots each parse correctly
 
 ### Technical
-- New `undo.py` module with UndoManager class
-- New `setlist_editor.py` module with editing dialogs
-- Integrated undo support throughout GUI operations
-- Action-based undo system for extensibility
+- New `simple_setlist_editor.py` standalone application
+- Enhanced `writer.py` with hardware-tested SLS1 updates
+- New `bit_utils.py` for binary manipulation
+- Configuration management with JSON
+- Cross-platform window positioning
 
-## [2.0.0] - 2025-11-16
+### Documentation
+- **SIMPLE_EDITOR_GUIDE.md**: Complete guide for setlist editor
+- **FEATURE_COMPARISON.md**: Detailed comparison with C# version
+- **PROJECT_STRUCTURE.md**: Repository organization guide
+- **RELEASE_CHECKLIST.md**: Pre-release verification checklist
+- Updated README.md with current features
+- Updated QUICKSTART.md with Simple Editor tutorial
 
-### Added
-- Complete cross-platform Python rewrite of PCG Tools
-- Full GUI with tkinter (works on Windows, macOS, Linux)
-- Comprehensive CLI with 7 commands
-- Copy/paste operations within and between files
-- Patch editing (name, category, favorite)
-- Move, sort, and compact operations
-- Program usage report generation
-- Combi content report generation
-- File comparison tool
-- Export to CSV and TXT formats
-- Multiple window support (MDI)
-- Context menus and keyboard shortcuts
-- Set list viewing (read-only)
-- Support for all Korg models (Kronos, Oasys, Triton, etc.)
-- Flexible PCG format parsing (handles multiple format versions)
-- EXi bank support (I-AA through I-EE)
-- Comprehensive test suite
-- Extensive documentation
+## [1.0.0] - 2025-11-21
 
-### Features
-- **File Operations**: Open, save, save as
-- **Editing**: Patch names, categories, favorites
-- **Clipboard**: Copy, cut, paste patches
-- **Organization**: Move, sort, compact banks
-- **Reports**: Program usage, combi content, file differences
-- **Export**: CSV and TXT formats
-- **Multi-window**: Work with multiple files simultaneously
+### Added - Initial Python Port
+- **Cross-platform Python rewrite** of PCG Tools
+- **Command-line interface** with 7 commands:
+  - `info`: Display PCG file information
+  - `list-patches`: List all patches
+  - `export`: Export patch list to CSV/TXT
+  - `program-usage`: Generate program usage report
+  - `combi-content`: Generate combi content report
+  - `differences`: Compare two PCG files
+  - `gui`: Launch GUI (note: has writer issues)
+- **PCG File Support**: All Korg models
+  - Kronos/Kronos X (all OS versions)
+  - Oasys
+  - M3/M50
+  - Triton (all variants)
+  - Karma
+  - Krome/Krome EX
+  - Kross/Kross 2
+  - Trinity
+- **Report Generation**:
+  - Program usage lists
+  - Combi content lists
+  - File comparison/differences
+  - Export to CSV and TXT formats
+- **Setlist Parsing**: Read all 16 setlists with 128 slots each
+- **Comprehensive Documentation**:
+  - README with quick start
+  - INSTALL guide for all platforms
+  - USAGE guide with examples
+  - QUICK_REFERENCE card
+  - TECHNICAL_REFERENCE for developers
+  - CONTRIBUTING guide
 
 ### Technical
 - Pure Python implementation (no .NET required)
-- Minimal dependencies (click for CLI, tkinter built-in)
+- Minimal dependencies (click for CLI, tkinter for GUI)
 - Chunk-based PCG file parsing
-- Handles multiple PCG format versions automatically
-- Preserves all binary data when editing
+- Handles multiple PCG format versions
 - Cross-platform file paths
 - Comprehensive error handling
 
-### Documentation
-- README with quick start guide
-- QUICKSTART guide (5 minutes)
-- USAGE guide (detailed instructions)
-- QUICK_REFERENCE card
-- FEATURE_COMPARISON with original
-- TECHNICAL_REFERENCE for developers
-- CONTRIBUTING guide
-- PROJECT_SUMMARY
+### Known Issues
+- Main GUI has writer issues (breaks files on save)
+- No program/combi editing in GUI
+- No copy/paste operations
+- Setlist editing read-only in main GUI
 
-### Testing
-- Comprehensive test suite (test_complete.py)
-- Tests all major features
-- Verified with real Kronos PCG files
-- Cross-platform testing
+---
 
-## [1.0.0] - Original PCG Tools
+## Comparison with Original C# Version
 
-### Reference
-This is a complete rewrite of the original PCG Tools by Michel Keijzers.
+### Python Version Advantages
+- ✅ **Hardware-tested setlist editing** (confirmed on Kronos)
+- ✅ **Cross-platform** (Windows, macOS, Linux)
+- ✅ **No .NET Framework required**
+- ✅ **Full CLI API** (7 commands)
+- ✅ **Can be used as Python library**
+- ✅ **Open source** (MIT License)
+- ✅ **Modern, maintainable codebase**
+- ✅ **Reliable writer** (doesn't break files)
 
-Original features:
-- Windows-only GUI (.NET Framework)
-- Basic file viewing and editing
-- Limited command-line support
+### Features from C# Not Yet Implemented
+- ❌ Program/Combi editing GUI
+- ❌ Copy/paste operations
+- ❌ Timbre editing
+- ❌ Batch operations (sort, compact, remove duplicates)
+- ❌ Program reference editing
+- ❌ Multiple windows
+- ❌ Multi-language support (15+ languages in C#)
+- ❌ SNG file support
+- ❌ Legacy model .syx file support
 
-### Improvements in 2.0.0
-- ✅ Cross-platform (Windows, macOS, Linux)
-- ✅ No .NET Framework required
-- ✅ Better CLI (7 commands vs limited)
-- ✅ Can be used as Python library
-- ✅ Open source and extensible
-- ✅ Modern, clean codebase
-- ✅ Comprehensive documentation
-- ✅ Automated testing
+See [FEATURE_COMPARISON.md](FEATURE_COMPARISON.md) for complete details.
 
 ---
 
 ## Future Roadmap
 
-### Planned Features
-- [ ] Full set list editing
-- [ ] Complete parameter editing (oscillators, filters, effects)
-- [ ] Undo/redo support
-- [ ] Drag and drop between windows
-- [ ] More export formats (JSON, XML)
-- [ ] Batch processing tools
+### High Priority
+- [ ] Program/Combi editing GUI
+- [ ] Copy/paste operations
+- [ ] Batch operations (sort, compact)
+- [ ] Program reference editing (change what slots point to)
+
+### Medium Priority
+- [ ] Multiple windows support
+- [ ] Undo/redo in Simple Editor
+- [ ] Master file support
+- [ ] Auto-backup
+- [ ] More export formats (XML, ASCII table)
+
+### Low Priority
+- [ ] Multi-language support
+- [ ] SNG file support (songs)
+- [ ] Legacy model .syx support
+- [ ] Virtual banks (Kronos)
 - [ ] Theme support
 
 ### Under Consideration
-- [ ] SNG file support (songs)
-- [ ] Master file connections
-- [ ] Global settings editing
-- [ ] Drum track editing
+- [ ] Drag and drop
 - [ ] Plugin system
 - [ ] Web interface
+- [ ] Automated tests
+- [ ] CI/CD pipeline
 
 ---
 
 ## Version History
 
-- **2.0.0** (2025-11-16): Complete Python rewrite, production ready
-- **1.0.0** (Original): Windows-only .NET version by Michel Keijzers
+- **1.1.0** (2025-11-26): Simple Setlist Editor, hardware-tested
+- **1.0.0** (2025-11-21): Initial Python port with CLI
+- **Original** (2019): C# version 3.1.0 by Michel Keijzers
+
+---
+
+## Credits
+
+**Original PCG Tools**: Michel Keijzers (C# version, 2011-2019)
+**Python Port**: 2025
+**Hardware Testing**: Korg Kronos
 
 ---
 
