@@ -1,95 +1,129 @@
-# Known Issues
+# Known Issues and Limitations
 
-## PCG Writer - FIXED! ✅
+## v1.1.0 - What Works and What Doesn't
 
-**Status**: ✅ WORKING ON HARDWARE (November 25, 2025)
+### ✅ What Works (Hardware Tested)
 
-The PCG writer now successfully saves modified files that load on Kronos hardware!
-
-**The Fix**:
-- Update ONLY SLS1 chunk (new format)
-- Leave SBK1 chunk (old format) unchanged
-- Kronos accepts mismatched SLS1/SBK1 names
-
-**What Works**:
-- ✅ Setlist name editing
+**Setlist Name Editing:**
+- ✅ Edit all 16 setlist names
+- ✅ Changes save correctly to PCG files
 - ✅ Files load on Kronos hardware
-- ✅ Names display correctly
-- ✅ All slots remain functional
+- ✅ Names display correctly on hardware
+- ✅ Hardware tested and confirmed working
 
-**Technical Details**:
-Changing the SBK1 chunk breaks hidden file validation (checksum/CRC/references). The solution is to only update SLS1, which is what the parser reads. The Kronos accepts files with mismatched names between formats.
+**CLI Tools (All Working):**
+- ✅ `info` - Display file information
+- ✅ `export` - Export patches to CSV/TXT
+- ✅ `list-patches` - List all programs/combis
+- ✅ `program-usage` - Show reference counts and where programs are used
+- ✅ `combi-content` - Show which programs each combi uses
+- ✅ `differences` - Compare two PCG files
 
-See `SOLUTION_CONFIRMED.md` and `WRITER_WORKING.md` for complete details.
+**File Support:**
+- ✅ Read PCG files from all Korg models
+- ✅ Parse programs, combis, setlists
+- ✅ Cross-platform (Windows, macOS, Linux)
 
-## Set List Support
+### ❌ What Doesn't Work Yet
 
-**Status**: ✅ FULLY FUNCTIONAL
+**Slot Property Editing:**
+- ❌ Slot colors, text size, transpose, volume, notes
+- **Why**: These properties are NOT stored in the SLS1/SLD1 format
+- **Details**: The internal 16-setlist format only stores setlist names and slot names (combi names)
+- **Workaround**: These are display settings on the Kronos itself, not in the PCG file
 
-Set list parsing and editing are now completely working!
+**Program/Combi Editing:**
+- ❌ No GUI for editing program/combi names
+- ❌ No editing of categories, favorites
+- ❌ No editing of program parameters
+- ❌ No editing of combi timbres
+- **Status**: Planned for v1.2.0
 
-**What Works**:
-- ✅ Set list names parse and can be edited/saved
-- ✅ Slot names parse and can be edited/saved
-- ✅ All 16 setlists with 128 slots each are supported
-- ✅ All changes persist across file save/load cycles
-- ✅ Tested with multiple PCG file formats
+**Advanced Features:**
+- ❌ Drum kits not parsed
+- ❌ Wave sequences not parsed
+- ❌ Copy/paste operations
+- ❌ Batch operations (sort, compact, remove duplicates)
+- ❌ Multiple windows
+- **Status**: Planned for future versions
 
-**Binary Structure (NEW Format)**:
-```
-SLS1 Chunk Structure (Kronos format):
-- Marker: 0x1E 0x02 0x00 0x00
-- Setlist name (24 bytes, null-terminated)
-- Separator: 0x28 0x0F 0x01 0x00
-- First slot name (24 bytes, no marker)
-- Remaining 127 slots, each with:
-  * Marker: 0x1E 0x02 0x00 0x00
-  * Slot name (24 bytes, null-terminated)
+### ⚠️ Important Notes
 
-Total: 16 setlists × 128 slots = 2048 slots
-Spacing: 28 bytes per slot (marker + name)
-```
+**SLS1/SLD1 Format Limitations:**
 
-**Features**:
-- View all setlists and their slots
-- Edit setlist names (24 characters max)
-- Edit slot names (24 characters max)
-- All changes save to PCG files
-- Works with both sparse and full setlists
+The internal 16-setlist format (SLS1/SLD1) used by Kronos only stores:
+- ✅ Setlist names (24 characters)
+- ✅ Slot names (combi names, 24 characters)
 
-## Set List Colors (SLS1/SLD1 Format)
+It does NOT store:
+- ❌ Slot colors
+- ❌ Text sizes
+- ❌ Transpose settings
+- ❌ Volume settings
+- ❌ Notes/descriptions
 
-**Status**: ⚠️ PARTIALLY SUPPORTED
+These are performance settings stored on the Kronos hardware itself, not in the PCG file.
 
-**What Works**:
-- ✅ STL1 format: Full color and text size support
-- ✅ All 16 official Kronos colors mapped
-- ✅ Color display in GUI with visual indicators
+**STL1 Format (Single Setlist Export):**
 
-**What's Missing**:
-- ❌ SLS1/SLD1 format: Color data not yet parsed
-- ❌ SDB1 chunk structure not fully reverse-engineered
+The single setlist export format (STL1) DOES include:
+- ✅ Colors
+- ✅ Text sizes
+- ✅ Transpose
+- ✅ Volume
+- ✅ Patch references
 
-**Details**:
-The SLS1/SLD1 format (internal 16 setlists) stores color data in the SDB1 chunk, but the structure hasn't been fully documented. Colors ARE present in the file (confirmed by Kronos displaying them), but we need the original PCG Tools documentation to understand the SDB1 format.
+Support for STL1 format editing is planned for a future version.
 
-**Workaround**:
-- Use STL1 format (single setlist export) for full color support
-- Export individual setlists from Kronos to get colors
-- See `SDB1_COLOR_TODO.md` for technical details
+### 🔧 Technical Details
 
-**References**:
-- `SLS1_COLOR_INVESTIGATION.md` - Investigation notes
-- `SDB1_COLOR_TODO.md` - Implementation plan
+**Writer Implementation:**
+- Updates ONLY the SLS1 chunk (new format)
+- Does NOT modify SBK1 chunk (old format)
+- Kronos accepts files with mismatched SLS1/SBK1 names
+- Changing SBK1 breaks hidden file validation
 
-## Recommendation
+**What's Parsed:**
+- Programs: name, id, bank, engine, favorite
+- Combis: name, id, bank, favorite, timbres (basic)
+- Timbres: midi_channel, mute, pan, volume, status, program reference
+- Setlists: name, slots with names
 
-PCG Tools now supports:
-- ✅ Viewing and editing Programs
-- ✅ Viewing and editing Combis  
-- ✅ Viewing and managing Set Lists (all 16 setlists)
-- ✅ Set list colors (STL1 format only)
-- ⚠️ Set list colors (SLS1 format - needs SDB1 documentation)
-- ✅ Copying/pasting patches
-- ✅ Organizing banks
-- ✅ Exporting patch lists
+**What's NOT Parsed:**
+- Full program parameters (oscillators, filters, effects, etc.)
+- Full combi parameters
+- Full timbre parameters (key zones, velocity zones, transpose, detune, etc.)
+- Drum kits
+- Wave sequences
+
+### 📋 Roadmap
+
+**v1.2.0 (Future):**
+- Program/Combi name editing
+- Category/favorite editing
+- Full parameter parsing
+
+**v1.3.0 (Future):**
+- STL1 format support (with slot properties)
+- Copy/paste operations
+- Batch operations
+
+**v2.0.0 (Future):**
+- Full program/combi parameter editing
+- Drum kit support
+- Wave sequence support
+
+### 💡 Recommendations
+
+**For Setlist Name Editing:**
+- ✅ Use Simple Setlist Editor - works perfectly!
+
+**For Slot Property Editing:**
+- ⚠️ Edit directly on Kronos hardware (not stored in PCG file)
+
+**For Program/Combi Editing:**
+- ⚠️ Use original C# PCG Tools for now
+- ✅ Python version coming in v1.2.0
+
+**For Reports and Analysis:**
+- ✅ Use CLI tools - all working great!

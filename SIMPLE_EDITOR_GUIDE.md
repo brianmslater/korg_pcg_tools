@@ -8,10 +8,10 @@ A clean, reliable GUI for editing PCG setlists and slots that **actually works o
 
 ### Core Editing
 ✅ **Hardware Tested** - Uses the working writer code directly
-✅ **Full Editing** - Setlist names, slot names, colors, transpose, volume, notes
+✅ **Setlist Name Editing** - Edit all 16 setlist names
 ✅ **Simple Interface** - Easy to use, no complexity
-✅ **No Extra Modifications** - Only changes what you edit
-✅ **Safe** - Doesn't break files like the main GUI
+✅ **Safe** - Doesn't break files
+✅ **Reliable** - Changes save and persist
 
 ### User Experience (v1.1)
 ✅ **Recent Files** - Quick access to last 10 files
@@ -20,6 +20,12 @@ A clean, reliable GUI for editing PCG setlists and slots that **actually works o
 ✅ **Keyboard Shortcuts** - Ctrl+O, Ctrl+S, etc.
 ✅ **Context Menu** - Right-click for quick actions
 ✅ **Slot Counter** - See how many slots are used
+
+### ⚠️ Current Limitations
+❌ **Slot Properties** - Color, text size, transpose, volume, notes are NOT stored in SLS1/SLD1 format
+- These are display settings on the Kronos itself, not in the PCG file
+- You can view slot names but can't edit their properties
+- Planned for v1.2.0 with STL1 format support
 
 ## How to Use
 
