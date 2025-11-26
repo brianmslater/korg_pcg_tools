@@ -9,21 +9,216 @@ Hardware tested and confirmed working on Korg Kronos.
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from pathlib import Path
+import json
 from pcg_tools.reader import read_pcg_file
 from pcg_tools.writer import write_pcg_file
 from pcg_tools.models import SLOT_COLOR_VALUES, SlotTextSize
+
+# Configuration file location
+CONFIG_FILE = Path.home() / '.pcg_tools_simple_editor.json'
+MAX_RECENT_FILES = 10
 
 class SimpleSetlistEditor:
     def __init__(self, root):
         self.root = root
         self.root.title("Simple Setlist Editor")
-        self.root.geometry("900x700")
         
         self.pcg = None
         self.current_file = None
         self.current_setlist = None
+        self.modified = False
+        self.recent_files = []
+        
+        # Load configuration
+        self.load_config()
+        
+        # Set window geometry from config or default
+        geometry = self.config.get('window_geometry', '900x700')
+        self.root.geometry(geometry)
         
         self.setup_ui()
+        self.setup_menu()
+        self.setup_keyboard_shortcuts()
+        
+        # Track window position changes
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+    
+    def load_config(self):
+        """Load configuration from file."""
+        self.config = {}
+        if CONFIG_FILE.exists():
+            try:
+                with open(CONFIG_FILE, 'r') as f:
+                    self.config = json.load(f)
+                self.recent_files = self.config.get('recent_files', [])
+            except Exception:
+                pass
+    
+    def save_config(self):
+        """Save configuration to file."""
+        try:
+            # Get current window geometry
+            self.config['window_geometry'] = self.root.geometry()
+            self.config['recent_files'] = self.recent_files[:MAX_RECENT_FILES]
+            
+            with open(CONFIG_FILE, 'w') as f:
+                json.dump(self.config, f, indent=2)
+        except Exception:
+            pass
+    
+    def add_recent_file(self, filepath):
+        """Add a file to the recent files list."""
+        filepath_str = str(filepath)
+        if filepath_str in self.recent_files:
+            self.recent_files.remove(filepath_str)
+        self.recent_files.insert(0, filepath_str)
+        self.recent_files = self.recent_files[:MAX_RECENT_FILES]
+        self.update_recent_files_menu()
+    
+    def setup_menu(self):
+        """Create the menu bar."""
+        menubar = tk.Menu(self.root)
+        self.root.config(menu=menubar)
+        
+        # File menu
+        file_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="File", menu=file_menu)
+        file_menu.add_command(label="Open...", command=self.browse_file, accelerator="Ctrl+O")
+        
+        # Recent files submenu
+        self.recent_menu = tk.Menu(file_menu, tearoff=0)
+        file_menu.add_cascade(label="Recent Files", menu=self.recent_menu)
+        self.update_recent_files_menu()
+        
+        file_menu.add_separator()
+        file_menu.add_command(label="Save", command=self.save_file, accelerator="Ctrl+S")
+        file_menu.add_command(label="Save As...", command=self.save_as_file, accelerator="Ctrl+Shift+S")
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit", command=self.on_closing, accelerator="Ctrl+Q")
+        
+        # Help menu
+        help_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Help", menu=help_menu)
+        help_menu.add_command(label="About", command=self.show_about)
+    
+    def update_recent_files_menu(self):
+        """Update the recent files menu."""
+        self.recent_menu.delete(0, tk.END)
+        
+        if not self.recent_files:
+            self.recent_menu.add_command(label="(No recent files)", state='disabled')
+            return
+        
+        for filepath in self.recent_files:
+            path = Path(filepath)
+            if path.exists():
+                self.recent_menu.add_command(
+                    label=path.name,
+                    command=lambda f=filepath: self.load_file(f)
+                )
+    
+    def setup_keyboard_shortcuts(self):
+        """Setup keyboard shortcuts."""
+        self.root.bind('<Control-o>', lambda e: self.browse_file())
+        self.root.bind('<Control-s>', lambda e: self.save_file())
+        self.root.bind('<Control-Shift-S>', lambda e: self.save_as_file())
+        self.root.bind('<Control-q>', lambda e: self.on_closing())
+    
+    def show_about(self):
+        """Show about dialog."""
+        messagebox.showinfo(
+            "About Simple Setlist Editor",
+            "Simple Setlist Editor v1.1\n\n"
+            "A clean, reliable GUI for editing PCG setlists.\n"
+            "Hardware tested on Korg Kronos.\n\n"
+            "Features:\n"
+            "• Edit setlist and slot names\n"
+            "• Change colors and text sizes\n"
+            "• Adjust transpose and volume\n"
+            "• Add notes to slots\n"
+            "• Recent files list\n"
+            "• Window position memory\n\n"
+            "Part of PCG Tools Python\n"
+            "https://github.com/yourusername/pcg-tools"
+        )
+    
+    def setup_context_menu(self):
+        """Setup context menu for slots."""
+        self.context_menu = tk.Menu(self.root, tearoff=0)
+        self.context_menu.add_command(label="Edit Slot", command=self.edit_slot)
+        self.context_menu.add_command(label="Clear Slot", command=self.clear_slot)
+        self.context_menu.add_separator()
+        self.context_menu.add_command(label="Copy Slot Name", command=self.copy_slot_name)
+        
+        self.slots_tree.bind('<Button-3>', self.show_context_menu)  # Right-click
+        if self.root.tk.call('tk', 'windowingsystem') == 'aqua':  # macOS
+            self.slots_tree.bind('<Button-2>', self.show_context_menu)
+            self.slots_tree.bind('<Control-Button-1>', self.show_context_menu)
+    
+    def show_context_menu(self, event):
+        """Show context menu at cursor position."""
+        # Select the item under cursor
+        item = self.slots_tree.identify_row(event.y)
+        if item:
+            self.slots_tree.selection_set(item)
+            self.context_menu.post(event.x_root, event.y_root)
+    
+    def clear_slot(self):
+        """Clear the selected slot."""
+        if not self.current_setlist:
+            return
+        
+        selection = self.slots_tree.selection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select a slot to clear.")
+            return
+        
+        # Get slot index
+        item = selection[0]
+        tags = self.slots_tree.item(item, 'tags')
+        if not tags:
+            return
+        
+        slot_idx = int(tags[0])
+        slot = self.current_setlist.slots[slot_idx]
+        
+        # Confirm
+        if not messagebox.askyesno("Clear Slot", f"Clear slot {slot_idx + 1}?\n\nThis will reset the slot to default values."):
+            return
+        
+        # Clear slot
+        slot.name = ""
+        slot.color = 0  # Default color
+        slot.text_size = SlotTextSize.M
+        slot.transpose = 0
+        slot.volume = 127
+        slot.notes = ""
+        
+        self.mark_modified()
+        self.update_slots_display()
+        self.status_label.config(text=f"Cleared slot {slot_idx + 1}", foreground="blue")
+    
+    def copy_slot_name(self):
+        """Copy the selected slot name to clipboard."""
+        if not self.current_setlist:
+            return
+        
+        selection = self.slots_tree.selection()
+        if not selection:
+            return
+        
+        item = selection[0]
+        tags = self.slots_tree.item(item, 'tags')
+        if not tags:
+            return
+        
+        slot_idx = int(tags[0])
+        slot = self.current_setlist.slots[slot_idx]
+        
+        if slot.name:
+            self.root.clipboard_clear()
+            self.root.clipboard_append(slot.name)
+            self.status_label.config(text=f"Copied '{slot.name}' to clipboard", foreground="blue")
     
     def setup_ui(self):
         """Create the user interface."""
@@ -96,6 +291,10 @@ class SimpleSetlistEditor:
         
         self.slots_tree.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         self.slots_tree.bind('<Double-Button-1>', self.edit_slot)
+        self.slots_tree.bind('<Return>', self.edit_slot)
+        
+        # Context menu for slots
+        self.setup_context_menu()
         
         # Scrollbar for table
         tree_scroll = ttk.Scrollbar(table_frame, orient="vertical", command=self.slots_tree.yview)
@@ -128,12 +327,21 @@ class SimpleSetlistEditor:
     
     def load_file(self, filename):
         """Load a PCG file."""
+        # Check for unsaved changes
+        if self.modified and not self.confirm_discard_changes():
+            return
+        
         try:
             self.status_label.config(text="Loading file...", foreground="orange")
             self.root.update()
             
             self.pcg = read_pcg_file(filename)
             self.current_file = Path(filename)
+            self.modified = False
+            self.update_title()
+            
+            # Add to recent files
+            self.add_recent_file(self.current_file)
             
             # Update UI
             self.file_label.config(text=self.current_file.name, foreground="black")
@@ -144,6 +352,37 @@ class SimpleSetlistEditor:
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load file:\n{str(e)}")
             self.status_label.config(text="Error loading file", foreground="red")
+    
+    def mark_modified(self):
+        """Mark the file as modified."""
+        if not self.modified:
+            self.modified = True
+            self.update_title()
+    
+    def update_title(self):
+        """Update the window title."""
+        title = "Simple Setlist Editor"
+        if self.current_file:
+            title += f" - {self.current_file.name}"
+            if self.modified:
+                title += " *"
+        self.root.title(title)
+    
+    def confirm_discard_changes(self):
+        """Ask user to confirm discarding unsaved changes."""
+        result = messagebox.askyesnocancel(
+            "Unsaved Changes",
+            "You have unsaved changes. Do you want to save them?",
+            icon='warning'
+        )
+        
+        if result is None:  # Cancel
+            return False
+        elif result:  # Yes - save
+            self.save_file()
+            return not self.modified  # Only proceed if save succeeded
+        else:  # No - discard
+            return True
     
     def update_setlist_display(self):
         """Update the setlist combo box."""
@@ -175,6 +414,10 @@ class SimpleSetlistEditor:
         if not self.current_setlist or not self.current_setlist.slots:
             return
         
+        # Count used slots
+        used_slots = sum(1 for slot in self.current_setlist.slots if slot.name and slot.name.strip())
+        total_slots = len(self.current_setlist.slots)
+        
         # Add slots to table
         for slot in self.current_setlist.slots:
             values = (
@@ -186,6 +429,13 @@ class SimpleSetlistEditor:
                 str(slot.volume)
             )
             self.slots_tree.insert('', tk.END, values=values, tags=(str(slot.slot_index),))
+        
+        # Update status with slot count
+        if hasattr(self, 'status_label'):
+            self.status_label.config(
+                text=f"Setlist: {self.current_setlist.name or '(Unnamed)'} - {used_slots}/{total_slots} slots used",
+                foreground="blue"
+            )
     
     def edit_setlist_name(self):
         """Edit the current setlist name."""
@@ -226,6 +476,7 @@ class SimpleSetlistEditor:
                 return
             
             self.current_setlist.name = new_name
+            self.mark_modified()
             self.update_setlist_display()
             self.status_label.config(text=f"Updated setlist name", foreground="blue")
             dialog.destroy()
@@ -334,6 +585,7 @@ class SimpleSetlistEditor:
             slot.volume = volume_var.get()
             slot.notes = notes_text.get('1.0', tk.END).strip()
             
+            self.mark_modified()
             self.update_slots_display()
             self.status_label.config(text=f"Updated slot {slot_idx + 1}", foreground="blue")
             dialog.destroy()
@@ -380,6 +632,9 @@ class SimpleSetlistEditor:
             write_pcg_file(self.pcg, str(filepath))
             
             self.current_file = filepath
+            self.modified = False
+            self.update_title()
+            self.add_recent_file(filepath)
             self.file_label.config(text=self.current_file.name)
             self.status_label.config(text=f"Saved to {self.current_file.name}", foreground="green")
             
@@ -388,23 +643,27 @@ class SimpleSetlistEditor:
         except Exception as e:
             messagebox.showerror("Error", f"Failed to save file:\n{str(e)}")
             self.status_label.config(text="Error saving file", foreground="red")
+    
+    def on_closing(self):
+        """Handle window closing."""
+        if self.modified and not self.confirm_discard_changes():
+            return
+        
+        # Save configuration
+        self.save_config()
+        
+        self.root.quit()
+        self.root.destroy()
 
 def main():
     """Run the simple setlist editor."""
     root = tk.Tk()
     app = SimpleSetlistEditor(root)
     
-    # Handle window closing
-    def on_closing():
-        root.quit()
-        root.destroy()
-    
-    root.protocol("WM_DELETE_WINDOW", on_closing)
-    
     try:
         root.mainloop()
     except KeyboardInterrupt:
-        pass
+        app.on_closing()
 
 if __name__ == '__main__':
     main()

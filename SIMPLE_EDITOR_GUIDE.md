@@ -6,11 +6,20 @@ A clean, reliable GUI for editing PCG setlists and slots that **actually works o
 
 ## Features
 
+### Core Editing
 ✅ **Hardware Tested** - Uses the working writer code directly
 ✅ **Full Editing** - Setlist names, slot names, colors, transpose, volume, notes
 ✅ **Simple Interface** - Easy to use, no complexity
 ✅ **No Extra Modifications** - Only changes what you edit
 ✅ **Safe** - Doesn't break files like the main GUI
+
+### User Experience (v1.1)
+✅ **Recent Files** - Quick access to last 10 files
+✅ **Window Memory** - Remembers position and size
+✅ **Unsaved Changes Warning** - Never lose work
+✅ **Keyboard Shortcuts** - Ctrl+O, Ctrl+S, etc.
+✅ **Context Menu** - Right-click for quick actions
+✅ **Slot Counter** - See how many slots are used
 
 ## How to Use
 
@@ -93,8 +102,22 @@ This editor:
 
 ## Keyboard Shortcuts
 
+### File Operations
+- **Ctrl+O** - Open file
+- **Ctrl+S** - Save file
+- **Ctrl+Shift+S** - Save As
+- **Ctrl+Q** - Quit
+
+### Editing
 - **Double-click** slot to edit
-- **Escape** to cancel edit dialog
+- **Return/Enter** - Edit selected slot
+- **Escape** - Cancel edit dialog
+
+### Context Menu
+- **Right-click** on slot for quick actions:
+  - Edit Slot
+  - Clear Slot
+  - Copy Slot Name
 
 ## File Safety
 
@@ -147,14 +170,27 @@ This editor:
 | Hardware compatibility | ✅ Tested | ❌ Files rejected |
 | Interface | Simple & clean | Complex |
 
+## Recent Files
+
+The editor remembers your last 10 opened files:
+- Access via **File → Recent Files** menu
+- Files are saved between sessions
+- Only shows files that still exist
+
+## Window Memory
+
+The editor remembers:
+- Window size
+- Window position
+- Automatically restored on next launch
+
 ## Future Enhancements
 
 Planned features:
 - Patch reference editing (change which patch a slot uses)
 - Batch operations (apply color/size to multiple slots)
 - Undo/redo
-- File backup
-- Slot copy/paste
+- Slot copy/paste between setlists
 
 ## Status
 
