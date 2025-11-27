@@ -1,17 +1,51 @@
 # Known Issues and Limitations
 
+## 🚨 Critical Issues
+
+### Program/Combi Editing Corrupts Files (v1.2.1)
+**Status:** ❌ DISABLED - Critical bug  
+**Severity:** Critical  
+**Affects:** All platforms  
+**Hardware Impact:** Files become unloadable on Kronos
+
+**Problem:**
+Editing program or combi names/parameters corrupts the PCG file. The Kronos hardware rejects edited files with "File Unavailable" error.
+
+**Root Cause:**
+Programs and combis have internal checksums or validation data that we don't know how to update. When we change any parameter (even just the name), the checksum becomes invalid and the Kronos rejects the file.
+
+**Evidence:**
+- Unmodified roundtrip: ✅ Works (file identical, loads on hardware)
+- Name-only edit: ❌ Fails (only 24 bytes changed, but file rejected)
+- Full edit: ❌ Fails (file rejected)
+
+**Current Status:**
+- Program/combi editing DISABLED in GUI (shows warning dialog)
+- Setlist editing still works perfectly (no checksums)
+- Parameter parsing works correctly (read-only)
+
+**Workaround:**
+Use the C# PCG Tools for program/combi editing until we figure out the checksum algorithm.
+
+**Investigation Needed:**
+1. Reverse engineer the checksum algorithm from C# code
+2. Find where checksums are stored in the binary format
+3. Implement checksum calculation and update
+
+---
+
 ## ✅ Fixed Issues
 
-### Program/Combi Editing on macOS (FIXED in v1.2.1)
+### Program/Combi Editing Crash on macOS (FIXED in v1.2.1)
 **Status:** ✅ FIXED  
-**Was:** Critical crash issue in v1.2.0  
+**Was:** Crash issue in v1.2.0  
 **Fixed:** v1.2.1 with native Qt dialog
 
 **Original Problem:**
 The edit dialog used Tkinter, which conflicted with PySide6 (Qt) on macOS, causing crashes.
 
 **Solution:**
-Replaced Tkinter dialog with native Qt dialog (`qt_edit_dialog.py`). Now works perfectly on all platforms.
+Replaced Tkinter dialog with native Qt dialog (`qt_edit_dialog.py`). However, editing is now disabled due to file corruption issue above.
 
 ---
 

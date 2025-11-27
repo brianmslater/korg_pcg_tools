@@ -585,27 +585,39 @@ class PcgMainWindow(QMainWindow):
     
     def edit_program(self, program):
         """Edit a program using the Qt edit dialog."""
-        from .qt_edit_dialog import QtEditPatchDialog
-        
-        dialog = QtEditPatchDialog(self, program, "program")
-        dialog.exec()
-        
-        if dialog.get_result():
-            # Refresh the programs table
-            self.load_programs()
-            self.mark_dirty()
+        # CRITICAL: Program editing is DISABLED due to file corruption
+        # Editing programs breaks hardware validation (checksum issue)
+        QMessageBox.warning(
+            self,
+            "Program Editing Disabled",
+            f"Program editing is currently disabled due to a critical bug.\n\n"
+            f"Program: {program.id} - {program.name}\n"
+            f"Category: {program.category.main_category if program.category else 'N/A'}\n"
+            f"Favorite: {program.favorite}\n"
+            f"Engine: {program.engine}\n\n"
+            f"Issue: Editing programs corrupts the file (Kronos shows 'File Unavailable').\n"
+            f"Cause: Programs have internal checksums that we don't know how to update.\n\n"
+            f"Workaround: Use the C# PCG Tools for program editing.\n"
+            f"Status: Being investigated for future release."
+        )
     
     def edit_combi(self, combi):
         """Edit a combi using the Qt edit dialog."""
-        from .qt_edit_dialog import QtEditPatchDialog
-        
-        dialog = QtEditPatchDialog(self, combi, "combi")
-        dialog.exec()
-        
-        if dialog.get_result():
-            # Refresh the combis table
-            self.load_combis()
-            self.mark_dirty()
+        # CRITICAL: Combi editing is DISABLED due to file corruption
+        # Editing combis breaks hardware validation (checksum issue)
+        QMessageBox.warning(
+            self,
+            "Combi Editing Disabled",
+            f"Combi editing is currently disabled due to a critical bug.\n\n"
+            f"Combi: {combi.id} - {combi.name}\n"
+            f"Category: {combi.category.main_category if combi.category else 'N/A'}\n"
+            f"Favorite: {combi.favorite}\n"
+            f"Tempo: {combi.tempo} BPM\n\n"
+            f"Issue: Editing combis corrupts the file (Kronos shows 'File Unavailable').\n"
+            f"Cause: Combis have internal checksums that we don't know how to update.\n\n"
+            f"Workaround: Use the C# PCG Tools for combi editing.\n"
+            f"Status: Being investigated for future release."
+        )
     
     def edit_slot_name(self, slot):
         """Edit slot name, color, and text size."""
