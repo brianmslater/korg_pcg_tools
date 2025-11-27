@@ -585,47 +585,33 @@ class PcgMainWindow(QMainWindow):
     
     def edit_program(self, program):
         """Edit a program using the edit dialog."""
-        # Import here to avoid circular imports
-        import tkinter as tk
-        from .edit_dialog import EditPatchDialog
-        
-        # Create a hidden Tk root window
-        root = tk.Tk()
-        root.withdraw()
-        
-        # Show the edit dialog
-        dialog = EditPatchDialog(root, program, "program")
-        result = dialog.show()
-        
-        # Clean up
-        root.destroy()
-        
-        if result:
-            # Refresh the programs table
-            self.load_programs()
-            self.mark_dirty()
+        # TODO: Replace Tkinter dialog with Qt dialog
+        # Tkinter conflicts with PySide6 on macOS
+        QMessageBox.information(
+            self,
+            "Edit Program",
+            f"Program editing temporarily disabled due to Tkinter/Qt conflict on macOS.\n\n"
+            f"Program: {program.id} - {program.name}\n"
+            f"Category: {program.category.main_category if program.category else 'N/A'}\n"
+            f"Favorite: {program.favorite}\n"
+            f"Engine: {program.engine}\n\n"
+            f"This will be fixed in the next update with a native Qt dialog."
+        )
     
     def edit_combi(self, combi):
         """Edit a combi using the edit dialog."""
-        # Import here to avoid circular imports
-        import tkinter as tk
-        from .edit_dialog import EditPatchDialog
-        
-        # Create a hidden Tk root window
-        root = tk.Tk()
-        root.withdraw()
-        
-        # Show the edit dialog
-        dialog = EditPatchDialog(root, combi, "combi")
-        result = dialog.show()
-        
-        # Clean up
-        root.destroy()
-        
-        if result:
-            # Refresh the combis table
-            self.load_combis()
-            self.mark_dirty()
+        # TODO: Replace Tkinter dialog with Qt dialog
+        # Tkinter conflicts with PySide6 on macOS
+        QMessageBox.information(
+            self,
+            "Edit Combi",
+            f"Combi editing temporarily disabled due to Tkinter/Qt conflict on macOS.\n\n"
+            f"Combi: {combi.id} - {combi.name}\n"
+            f"Category: {combi.category.main_category if combi.category else 'N/A'}\n"
+            f"Favorite: {combi.favorite}\n"
+            f"Tempo: {combi.tempo} BPM\n\n"
+            f"This will be fixed in the next update with a native Qt dialog."
+        )
     
     def edit_slot_name(self, slot):
         """Edit slot name, color, and text size."""

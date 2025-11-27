@@ -1,5 +1,31 @@
 # Known Issues and Limitations
 
+## 🚨 Critical Issue (v1.2.0)
+
+### Program/Combi Editing Disabled on macOS
+**Status:** Temporary workaround in place  
+**Severity:** High  
+**Affects:** v1.2.0 Qt GUI on macOS  
+**Fix:** Coming in v1.2.1
+
+**Problem:**
+The edit dialog uses Tkinter, which conflicts with PySide6 (Qt) on macOS. When you try to edit a program or combi by double-clicking or using the Edit button, the application crashes with:
+```
+NSInvalidArgumentException: -[QNSApplication _setup:]: unrecognized selector
+```
+
+**Current Workaround:**
+- Edit functionality temporarily disabled in Qt GUI
+- Shows info dialog instead of crashing
+- Use `simple_setlist_editor.py` for setlist editing (works fine - no conflict)
+- Programmatic editing still works (see `test_edit_programmatic.py`)
+- Parameter parsing works correctly (all data is read properly)
+
+**Permanent Fix:**
+Will be resolved in v1.2.1 by replacing Tkinter dialog with native Qt dialog.
+
+---
+
 ## v1.1.0 - What Works and What Doesn't
 
 ### ✅ What Works (Hardware Tested)
