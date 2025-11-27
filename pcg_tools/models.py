@@ -120,7 +120,9 @@ class Program:
     category: Optional[Category] = None
     favorite: bool = False
     engine: str = ""  # Engine type (HD-1, AL-1, CX-3, STR-1, EP-1, etc.)
+    osc_mode: str = ""  # Oscillator mode: Single, Double, Drums, Double Drums, etc.
     raw_data: bytes = b''
+    _raw_offset: int = 0  # Track offset in file for writing back
     
     @property
     def id(self) -> str:
@@ -138,6 +140,12 @@ class Timbre:
     volume: int = 127
     pan: int = 64
     mute: bool = False
+    detune: int = 0  # Detune in cents (signed, -1200 to +1200)
+    transpose: int = 0  # Transpose in semitones (signed, -24 to +24)
+    bottom_key: int = 0  # Bottom key of zone (0-127, C-1 to G9)
+    top_key: int = 127  # Top key of zone (0-127, C-1 to G9)
+    bottom_velocity: int = 1  # Bottom velocity (1-127)
+    top_velocity: int = 127  # Top velocity (1-127)
     
     @property
     def program_id(self) -> str:
@@ -153,8 +161,10 @@ class Combi:
     name: str
     category: Optional[Category] = None
     favorite: bool = False
+    tempo: float = 120.0  # Tempo in BPM
     timbres: List[Timbre] = field(default_factory=list)
     raw_data: bytes = b''
+    _raw_offset: int = 0  # Track offset in file for writing back
     
     @property
     def id(self) -> str:

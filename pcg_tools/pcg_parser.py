@@ -151,11 +151,17 @@ class PcgBinaryParser:
             # Extract engine information
             engine = self._extract_engine(self.data[offset:offset+program_size])
             
+            # Extract additional parameters
+            osc_mode, category, favorite = self._extract_program_params(self.data[offset:offset+program_size])
+            
             program = Program(
                 bank=bank_name,
                 index=i,
                 name=name,
                 engine=engine,
+                osc_mode=osc_mode,
+                category=category,
+                favorite=favorite,
                 raw_data=self.data[offset:offset+program_size]
             )
             
@@ -225,11 +231,17 @@ class PcgBinaryParser:
                 # Extract engine information
                 engine = self._extract_engine(self.data[prog_offset:prog_offset+program_size])
                 
+                # Extract additional parameters
+                osc_mode, category, favorite = self._extract_program_params(self.data[prog_offset:prog_offset+program_size])
+                
                 program = Program(
                     bank=bank_id,
                     index=idx,
                     name=name,
                     engine=engine,
+                    osc_mode=osc_mode,
+                    category=category,
+                    favorite=favorite,
                     raw_data=self.data[prog_offset:prog_offset+program_size]
                 )
                 
@@ -242,6 +254,46 @@ class PcgBinaryParser:
             debug_print(f"  Added bank {bank_id} with {len(programs)} programs")
         
         return start_offset + 8 + chunk_size + 12
+    
+    def _extract_program_params(self, program_data: bytes) -> Tuple[str, Optional[Category], bool]:
+        """Extract program parameters: OSC Mode, Category, and Favorite flag.
+        
+        Based on C# KronosProgram.cs:
+        - OSC Mode: offset 2558, 2 bytes (enum: Single, Double, Drums, -, -, Double Drums)
+        - Category: offset 2568, bits 4-0 (5 bits)
+        - SubCategory: offset 2568, bits 7-5 (3 bits)
+        - Favorite: offset 2558, bit 5
+        
+        Returns:
+            Tuple of (osc_mode, category, favorite)
+        """
+        if len(program_data) < 2570:
+            return ("", None, False)
+        
+        try:
+            # OSC Mode (2 bytes at offset 2558, little-endian)
+            # Extract bits 0-2 from the 2-byte value
+            osc_mode_raw = struct.unpack('<H', program_data[2558:2560])[0]
+            osc_mode_value = osc_mode_raw & 0x07  # Extract lower 3 bits
+            osc_modes = ["Single", "Double", "Drums", "- (EXi)", "- (Unused)", "Double Drums"]
+            osc_mode = osc_modes[osc_mode_value] if osc_mode_value < len(osc_modes) else f"Unknown({osc_mode_value})"
+            
+            # Favorite flag (bit 5 of byte 2558)
+            favorite = bool(program_data[2558] & 0x20)
+            
+            # Category and SubCategory (byte 2568)
+            cat_byte = program_data[2568]
+            main_category = cat_byte & 0x1F  # Bits 4-0
+            sub_category = (cat_byte >> 5) & 0x07  # Bits 7-5
+            
+            category = Category(
+                main_category=main_category,
+                sub_category=sub_category
+            )
+            
+            return (osc_mode, category, favorite)
+        except:
+            return ("", None, False)
     
     def _extract_engine(self, program_data: bytes) -> str:
         """Extract engine type from program data.
@@ -792,10 +844,16 @@ class PcgBinaryParser:
                 # Parse timbres from combi data
                 timbres = self._parse_timbres(combi_offset)
                 
+                # Extract combi parameters
+                category, favorite, tempo = self._extract_combi_params(self.data[combi_offset:combi_offset+7810])
+                
                 combi = Combi(
                     bank=bank_id,
                     index=idx,
                     name=name,
+                    category=category,
+                    favorite=favorite,
+                    tempo=tempo,
                     timbres=timbres,
                     raw_data=self.data[combi_offset:combi_offset+7810]
                 )
@@ -810,6 +868,43 @@ class PcgBinaryParser:
             debug_print(f"  Added bank {bank_id} with {len(combis)} combis")
         
         return start_offset + 8 + chunk_size + 12
+    
+    def _extract_combi_params(self, combi_data: bytes) -> Tuple[Optional[Category], bool, float]:
+        """Extract combi parameters: Category, Favorite flag, and Tempo.
+        
+        Based on C# KronosCombi.cs:
+        - Category: offset 4790, bits 4-0 (5 bits)
+        - SubCategory: offset 4790, bits 7-5 (3 bits)
+        - Favorite: offset 4791, bit 0
+        - Tempo: offset 1304, 2 bytes (word, little-endian, divide by 100 for BPM)
+        
+        Returns:
+            Tuple of (category, favorite, tempo)
+        """
+        if len(combi_data) < 4792:
+            return (None, False, 120.0)
+        
+        try:
+            # Category and SubCategory (byte 4790)
+            cat_byte = combi_data[4790]
+            main_category = cat_byte & 0x1F  # Bits 4-0
+            sub_category = (cat_byte >> 5) & 0x07  # Bits 7-5
+            
+            category = Category(
+                main_category=main_category,
+                sub_category=sub_category
+            )
+            
+            # Favorite flag (bit 0 of byte 4791)
+            favorite = bool(combi_data[4791] & 0x01)
+            
+            # Tempo (2 bytes at offset 1304, little-endian, divide by 100)
+            tempo_raw = struct.unpack('<H', combi_data[1304:1306])[0]
+            tempo = tempo_raw / 100.0
+            
+            return (category, favorite, tempo)
+        except:
+            return (None, False, 120.0)
     
     def _parse_timbres(self, combi_offset: int) -> List:
         """Parse timbres from combi data.
@@ -866,11 +961,33 @@ class PcgBinaryParser:
                 # MIDI channel (offset +2)
                 midi_channel = self.data[timbre_offset + 2] if timbre_offset + 2 < len(self.data) else 0
                 
-                # Volume (offset +8)
-                volume = self.data[timbre_offset + 8] if timbre_offset + 8 < len(self.data) else 127
+                # Volume (offset +6)
+                volume = self.data[timbre_offset + 6] if timbre_offset + 6 < len(self.data) else 127
                 
-                # Pan (offset +9)
-                pan = self.data[timbre_offset + 9] if timbre_offset + 9 < len(self.data) else 64
+                # Pan (offset +7)
+                pan = self.data[timbre_offset + 7] if timbre_offset + 7 < len(self.data) else 64
+                
+                # Detune (offset +8, 2 bytes, signed) - Based on C# KronosTimbre.cs
+                detune = 0
+                if timbre_offset + 10 <= len(self.data):
+                    detune_raw = struct.unpack('<h', self.data[timbre_offset + 8:timbre_offset + 10])[0]
+                    detune = detune_raw  # Already signed
+                
+                # Transpose (offset +10, 1 byte, signed, -24 to +24)
+                transpose = 0
+                if timbre_offset + 11 <= len(self.data):
+                    transpose_byte = self.data[timbre_offset + 10]
+                    # Convert to signed (-24 to +24)
+                    transpose = transpose_byte - 64 if transpose_byte >= 40 else transpose_byte
+                
+                # Key zone (bottom/top keys) - need to find correct offsets
+                # For now, use reasonable defaults
+                bottom_key = 0
+                top_key = 127
+                
+                # Velocity zone
+                bottom_velocity = 1
+                top_velocity = 127
                 
                 timbre = Timbre(
                     program_bank=prog_bank,
@@ -879,7 +996,13 @@ class PcgBinaryParser:
                     status=status,
                     volume=volume,
                     pan=pan,
-                    mute=False
+                    mute=False,
+                    detune=detune,
+                    transpose=transpose,
+                    bottom_key=bottom_key,
+                    top_key=top_key,
+                    bottom_velocity=bottom_velocity,
+                    top_velocity=top_velocity
                 )
                 
                 timbres.append(timbre)

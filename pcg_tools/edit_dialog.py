@@ -181,39 +181,46 @@ class EditPatchDialog:
         main_frame = ttk.Frame(self.dialog, padding=20)
         main_frame.pack(fill=tk.BOTH, expand=True)
         
+        # ID (read-only)
+        ttk.Label(main_frame, text="ID:").grid(row=0, column=0, sticky=tk.W, pady=5)
+        id_label = ttk.Label(main_frame, text=self.patch.id, font=('TkDefaultFont', 9, 'bold'))
+        id_label.grid(row=0, column=1, sticky=tk.W, pady=5)
+        
         # Name
-        ttk.Label(main_frame, text="Name:").grid(row=0, column=0, sticky=tk.W, pady=5)
+        ttk.Label(main_frame, text="Name:").grid(row=1, column=0, sticky=tk.W, pady=5)
         self.name_var = tk.StringVar(value=self.patch.name)
         name_entry = ttk.Entry(main_frame, textvariable=self.name_var, width=30)
-        name_entry.grid(row=0, column=1, sticky=tk.EW, pady=5)
+        name_entry.grid(row=1, column=1, sticky=tk.EW, pady=5)
         name_entry.focus()
         
         # Character count
         self.char_count_label = ttk.Label(main_frame, text=f"{len(self.patch.name)}/24")
-        self.char_count_label.grid(row=0, column=2, padx=5)
+        self.char_count_label.grid(row=1, column=2, padx=5)
         self.name_var.trace_add('write', self._update_char_count)
         
+        # Favorite checkbox (on same row as name, right side)
+        self.favorite_var = tk.BooleanVar(value=self.patch.favorite)
+        favorite_check = ttk.Checkbutton(main_frame, text="Is Favorite", variable=self.favorite_var)
+        favorite_check.grid(row=1, column=3, sticky=tk.W, padx=10, pady=5)
+        
         # Category
-        ttk.Label(main_frame, text="Category:").grid(row=1, column=0, sticky=tk.W, pady=5)
-        current_cat = self.patch.category.name if self.patch.category else ""
-        self.category_var = tk.StringVar(value=current_cat)
-        self.category_combo = ttk.Combobox(main_frame, textvariable=self.category_var, width=27, state='readonly')
-        self.category_combo['values'] = self._get_categories()
-        self.category_combo.grid(row=1, column=1, sticky=tk.EW, pady=5)
-        self.category_combo.bind('<<ComboboxSelected>>', self._on_category_change)
+        ttk.Label(main_frame, text="Category:").grid(row=2, column=0, sticky=tk.W, pady=5)
+        current_cat = self.patch.category.main_category if self.patch.category else 0
+        self.category_var = tk.IntVar(value=current_cat)
+        self.category_spinbox = ttk.Spinbox(main_frame, from_=0, to=16, textvariable=self.category_var, width=10)
+        self.category_spinbox.grid(row=2, column=1, sticky=tk.W, pady=5)
+        
+        # Category name (read-only label)
+        self.category_name_label = ttk.Label(main_frame, text=self._get_category_name(current_cat))
+        self.category_name_label.grid(row=2, column=2, columnspan=2, sticky=tk.W, padx=5)
+        self.category_var.trace_add('write', self._update_category_name)
         
         # Sub-Category
-        ttk.Label(main_frame, text="Sub-Category:").grid(row=2, column=0, sticky=tk.W, pady=5)
-        current_subcat = self.patch.category.sub_name if self.patch.category else ""
-        self.subcategory_var = tk.StringVar(value=current_subcat)
-        self.subcategory_combo = ttk.Combobox(main_frame, textvariable=self.subcategory_var, width=27, state='readonly')
-        self.subcategory_combo['values'] = self._get_subcategories(current_cat)
-        self.subcategory_combo.grid(row=2, column=1, sticky=tk.EW, pady=5)
-        
-        # Favorite
-        self.favorite_var = tk.BooleanVar(value=self.patch.favorite)
-        favorite_check = ttk.Checkbutton(main_frame, text="Mark as Favorite", variable=self.favorite_var)
-        favorite_check.grid(row=3, column=1, sticky=tk.W, pady=5)
+        ttk.Label(main_frame, text="Sub Category:").grid(row=3, column=0, sticky=tk.W, pady=5)
+        current_subcat = self.patch.category.sub_category if self.patch.category else 0
+        self.subcategory_var = tk.IntVar(value=current_subcat)
+        self.subcategory_spinbox = ttk.Spinbox(main_frame, from_=0, to=7, textvariable=self.subcategory_var, width=10)
+        self.subcategory_spinbox.grid(row=3, column=1, sticky=tk.W, pady=5)
         
         # Buttons
         button_frame = ttk.Frame(main_frame)
@@ -242,13 +249,39 @@ class EditPatchDialog:
         else:
             self.char_count_label.config(foreground='black')
     
-    def _on_category_change(self, event=None):
-        """Handle category selection change."""
-        category = self.category_var.get()
-        subcategories = self._get_subcategories(category)
-        self.subcategory_combo['values'] = subcategories
-        if subcategories:
-            self.subcategory_combo.current(0)
+    def _update_category_name(self, *args):
+        """Update category name label when category changes."""
+        try:
+            cat_num = self.category_var.get()
+            cat_name = self._get_category_name(cat_num)
+            self.category_name_label.config(text=cat_name)
+        except:
+            pass
+    
+    def _get_category_name(self, category_num):
+        """Get category name from number."""
+        categories = [
+            "Keyboard",           # 0
+            "Organ",              # 1
+            "Bass",               # 2
+            "Guitar/Plucked",     # 3
+            "Strings/Ensemble",   # 4
+            "Brass",              # 5
+            "Sax/Woodwind",       # 6
+            "Synth Lead",         # 7
+            "Synth Pad/Strings",  # 8
+            "Synth PolyKey",      # 9
+            "Synth Comp/Seq",     # 10
+            "Drums/Percussion",   # 11
+            "Sound Effects",      # 12
+            "Ethnic",             # 13
+            "Vocoder",            # 14
+            "Combination",        # 15
+            "No Assign"           # 16
+        ]
+        if 0 <= category_num < len(categories):
+            return categories[category_num]
+        return "Unknown"
     
     def _get_categories(self):
         """Get list of available categories."""
@@ -393,59 +426,98 @@ class EditPatchDialog:
         
         # Update category and subcategory
         if self.patch.category:
-            self.patch.category.name = self.category_var.get()
-            self.patch.category.sub_name = self.subcategory_var.get()
+            self.patch.category.main_category = self.category_var.get()
+            self.patch.category.sub_category = self.subcategory_var.get()
+            self.patch.category.name = self._get_category_name(self.category_var.get())
         else:
             # Create category if it doesn't exist
             from .models import Category
             self.patch.category = Category(
-                main_category=0,
-                sub_category=0,
-                name=self.category_var.get(),
-                sub_name=self.subcategory_var.get()
+                main_category=self.category_var.get(),
+                sub_category=self.subcategory_var.get(),
+                name=self._get_category_name(self.category_var.get())
             )
         
-        # Update raw_data with new name
-        self._update_raw_data_name()
-        
-        # Update raw_data with favorite flag (if needed)
-        self._update_raw_data_favorite()
+        # Update raw_data with all changes
+        self._update_raw_data()
         
         self.result = True
         self.dialog.destroy()
     
-    def _update_raw_data_name(self):
-        """Update the raw_data with the new name."""
-        if not self.patch.raw_data or len(self.patch.raw_data) < 24:
+    def _update_raw_data(self):
+        """Update the raw_data with all changes."""
+        if not self.patch.raw_data:
             return
         
-        # Name is at offset 0 in both Program and Combi raw data
-        # Convert name to bytes (24 bytes, null-padded)
-        name_bytes = self.patch.name.encode('ascii', errors='replace')[:24]
-        name_bytes = name_bytes.ljust(24, b'\x00')
-        
-        # Update raw_data
         raw_data = bytearray(self.patch.raw_data)
-        raw_data[0:24] = name_bytes
+        
+        # Update name (offset 0, 24 bytes)
+        if len(raw_data) >= 24:
+            name_bytes = self.patch.name.encode('ascii', errors='replace')[:24]
+            name_bytes = name_bytes.ljust(24, b'\x00')
+            raw_data[0:24] = name_bytes
+        
+        # Update based on patch type
+        if isinstance(self.patch, Program):
+            self._update_program_raw_data(raw_data)
+        elif isinstance(self.patch, Combi):
+            self._update_combi_raw_data(raw_data)
+        
         self.patch.raw_data = bytes(raw_data)
     
-    def _update_raw_data_favorite(self):
-        """Update the raw_data with the favorite flag."""
-        if not self.patch.raw_data or len(self.patch.raw_data) < 30:
+    def _update_program_raw_data(self, raw_data):
+        """Update program-specific raw data.
+        
+        Based on C# KronosProgram.cs:
+        - Category: offset 2568, bits 4-0
+        - SubCategory: offset 2568, bits 7-5
+        - Favorite: offset 2558, bit 5
+        """
+        if len(raw_data) < 2569:
             return
         
-        # Favorite flag is typically at offset 24-25 in Kronos patches
-        # This is a simplified implementation - actual location may vary
-        raw_data = bytearray(self.patch.raw_data)
+        # Update category byte (offset 2568)
+        cat_byte = raw_data[2568]
+        # Clear category bits (4-0) and subcategory bits (7-5)
+        cat_byte = 0
+        # Set category (bits 4-0)
+        cat_byte |= (self.patch.category.main_category & 0x1F)
+        # Set subcategory (bits 7-5)
+        cat_byte |= ((self.patch.category.sub_category & 0x07) << 5)
+        raw_data[2568] = cat_byte
         
-        # For Kronos, favorite is often stored as a bit flag
-        # We'll set/clear a flag byte at offset 24
+        # Update favorite flag (offset 2558, bit 5)
         if self.patch.favorite:
-            raw_data[24] |= 0x01  # Set bit 0
+            raw_data[2558] |= 0x20  # Set bit 5
         else:
-            raw_data[24] &= ~0x01  # Clear bit 0
+            raw_data[2558] &= ~0x20  # Clear bit 5
+    
+    def _update_combi_raw_data(self, raw_data):
+        """Update combi-specific raw data.
         
-        self.patch.raw_data = bytes(raw_data)
+        Based on C# KronosCombi.cs:
+        - Category: offset 4790, bits 4-0
+        - SubCategory: offset 4790, bits 7-5
+        - Favorite: offset 4791, bit 0
+        """
+        if len(raw_data) < 4792:
+            return
+        
+        # Update category byte (offset 4790)
+        cat_byte = raw_data[4790]
+        # Clear category bits (4-0) and subcategory bits (7-5)
+        cat_byte = 0
+        # Set category (bits 4-0)
+        cat_byte |= (self.patch.category.main_category & 0x1F)
+        # Set subcategory (bits 7-5)
+        cat_byte |= ((self.patch.category.sub_category & 0x07) << 5)
+        raw_data[4790] = cat_byte
+        
+        # Update favorite flag (offset 4791, bit 0)
+        if self.patch.favorite:
+            raw_data[4791] |= 0x01  # Set bit 0
+        else:
+            raw_data[4791] &= ~0x01  # Clear bit 0
     
     def _on_cancel(self):
         """Handle Cancel button."""

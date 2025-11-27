@@ -5,6 +5,54 @@ All notable changes to PCG Tools Python will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2025-11-26
+
+### Added - Full Parameter Parsing and Editing
+- **Program Parameter Parsing**: Parse all essential program parameters
+  - OSC Mode (Single, Double, Drums, EXi, Double Drums)
+  - Category and SubCategory (0-16, 0-7)
+  - Favorite flag
+  - Engine type (HD-1, AL-1, CX-3, STR-1, SGX-1, SGX-2, MOD-7, etc.)
+- **Combi Parameter Parsing**: Parse all essential combi parameters
+  - Tempo (BPM)
+  - Category and SubCategory
+  - Favorite flag
+- **Timbre Parameter Parsing**: Parse detailed timbre parameters
+  - Detune (cents)
+  - Transpose (semitones)
+  - Key zones (bottom/top keys)
+  - Velocity zones (bottom/top velocity)
+  - Volume, Pan, Status, MIDI channel
+- **Program/Combi Editing**: Edit dialog for programs and combis
+  - Edit name (24 characters max)
+  - Edit category/subcategory with spinboxes
+  - Toggle favorite flag
+  - Changes persist correctly to file
+- **Qt GUI Integration**: Edit functionality integrated into main GUI
+  - Double-click or Edit button to edit programs/combis
+  - Changes reflected immediately in table
+  - Dirty flag (*) indicates unsaved changes
+
+### Improved
+- **Edit Dialog**: Redesigned to match C# PCG Tools layout
+- **Category Display**: Show numeric category values in tables
+- **Raw Data Write-Back**: Proper byte-level editing at correct offsets
+- **Models**: Enhanced with all parsed parameters
+
+### Technical
+- New `_extract_program_params()` in pcg_parser.py
+- New `_extract_combi_params()` in pcg_parser.py
+- Enhanced `_parse_timbres()` for additional parameters
+- Updated `EditPatchDialog` with proper raw_data write-back
+- Added `_raw_offset` tracking for programs and combis
+- Comprehensive test suite for parameter parsing and editing
+
+### Documentation
+- **v1.2.0_parameter_parsing.md**: Implementation details
+- **v1.2.0_complete.md**: Feature completion summary
+- **test_parameter_parsing.py**: Verification script
+- **test_edit_programmatic.py**: Edit and persistence tests
+
 ## [1.1.0] - 2025-11-26
 
 ### Added - Simple Setlist Editor

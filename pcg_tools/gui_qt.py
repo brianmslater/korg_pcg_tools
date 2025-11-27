@@ -305,8 +305,8 @@ class PcgMainWindow(QMainWindow):
                 
                 self.programs_table.setItem(row, 0, QTableWidgetItem(prog.id))
                 self.programs_table.setItem(row, 1, QTableWidgetItem(prog.name))
-                self.programs_table.setItem(row, 2, QTableWidgetItem(prog.category.name if prog.category else ""))
-                self.programs_table.setItem(row, 3, QTableWidgetItem(prog.category.sub_name if prog.category else ""))
+                self.programs_table.setItem(row, 2, QTableWidgetItem(str(prog.category.main_category) if prog.category else ""))
+                self.programs_table.setItem(row, 3, QTableWidgetItem(str(prog.category.sub_category) if prog.category else ""))
                 self.programs_table.setItem(row, 4, QTableWidgetItem(prog.engine if hasattr(prog, 'engine') else ""))
                 self.programs_table.setItem(row, 5, QTableWidgetItem("✓" if prog.favorite else ""))
                 program_count += 1
@@ -332,8 +332,8 @@ class PcgMainWindow(QMainWindow):
                 
                 self.combis_table.setItem(row, 0, QTableWidgetItem(combi.id))
                 self.combis_table.setItem(row, 1, QTableWidgetItem(combi.name))
-                self.combis_table.setItem(row, 2, QTableWidgetItem(combi.category.name if combi.category else ""))
-                self.combis_table.setItem(row, 3, QTableWidgetItem(combi.category.sub_name if combi.category else ""))
+                self.combis_table.setItem(row, 2, QTableWidgetItem(str(combi.category.main_category) if combi.category else ""))
+                self.combis_table.setItem(row, 3, QTableWidgetItem(str(combi.category.sub_category) if combi.category else ""))
                 self.combis_table.setItem(row, 4, QTableWidgetItem("✓" if combi.favorite else ""))
                 combi_count += 1
         
@@ -510,7 +510,23 @@ class PcgMainWindow(QMainWindow):
         """Edit selected item."""
         current_tab = self.tabs.currentIndex()
         
-        if current_tab == 2:  # Setlists
+        if current_tab == 0:  # Programs
+            row = self.programs_table.currentRow()
+            if row >= 0:
+                # Get the program from the PCG file
+                program = self._get_program_at_row(row)
+                if program:
+                    self.edit_program(program)
+        
+        elif current_tab == 1:  # Combis
+            row = self.combis_table.currentRow()
+            if row >= 0:
+                # Get the combi from the PCG file
+                combi = self._get_combi_at_row(row)
+                if combi:
+                    self.edit_combi(combi)
+        
+        elif current_tab == 2:  # Setlists
             row = self.slots_table.currentRow()
             if row >= 0 and row < 128:
                 setlist = self.setlist_combo.currentData()
@@ -540,6 +556,76 @@ class PcgMainWindow(QMainWindow):
                         )
                         setlist.slots.append(slot)
                         self.edit_slot_name(slot)
+    
+    def _get_program_at_row(self, row):
+        """Get program at specified table row."""
+        if not self.pcg:
+            return None
+        
+        current_row = 0
+        for bank in self.pcg.program_banks:
+            for prog in bank.patches:
+                if current_row == row:
+                    return prog
+                current_row += 1
+        return None
+    
+    def _get_combi_at_row(self, row):
+        """Get combi at specified table row."""
+        if not self.pcg:
+            return None
+        
+        current_row = 0
+        for bank in self.pcg.combi_banks:
+            for combi in bank.patches:
+                if current_row == row:
+                    return combi
+                current_row += 1
+        return None
+    
+    def edit_program(self, program):
+        """Edit a program using the edit dialog."""
+        # Import here to avoid circular imports
+        import tkinter as tk
+        from .edit_dialog import EditPatchDialog
+        
+        # Create a hidden Tk root window
+        root = tk.Tk()
+        root.withdraw()
+        
+        # Show the edit dialog
+        dialog = EditPatchDialog(root, program, "program")
+        result = dialog.show()
+        
+        # Clean up
+        root.destroy()
+        
+        if result:
+            # Refresh the programs table
+            self.load_programs()
+            self.mark_dirty()
+    
+    def edit_combi(self, combi):
+        """Edit a combi using the edit dialog."""
+        # Import here to avoid circular imports
+        import tkinter as tk
+        from .edit_dialog import EditPatchDialog
+        
+        # Create a hidden Tk root window
+        root = tk.Tk()
+        root.withdraw()
+        
+        # Show the edit dialog
+        dialog = EditPatchDialog(root, combi, "combi")
+        result = dialog.show()
+        
+        # Clean up
+        root.destroy()
+        
+        if result:
+            # Refresh the combis table
+            self.load_combis()
+            self.mark_dirty()
     
     def edit_slot_name(self, slot):
         """Edit slot name, color, and text size."""
