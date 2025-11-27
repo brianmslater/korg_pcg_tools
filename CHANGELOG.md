@@ -5,6 +5,18 @@ All notable changes to PCG Tools Python will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2025-11-26
+
+### Fixed - macOS Crash Issue
+- **Native Qt Edit Dialog**: Replaced Tkinter dialog with pure Qt implementation
+- **macOS Compatibility**: Fixed crash when editing programs/combis on macOS
+- **Cross-Platform**: Edit dialog now works on all platforms (macOS, Windows, Linux)
+
+### Technical
+- New `qt_edit_dialog.py` - Pure Qt implementation
+- Removed Tkinter dependency from GUI editing
+- Same functionality, better compatibility
+
 ## [1.2.0] - 2025-11-26
 
 ### Added - Full Parameter Parsing and Editing
