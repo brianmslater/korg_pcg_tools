@@ -942,14 +942,25 @@ class PcgBinaryParser:
                 prog_num_byte = self.data[timbre_offset + 0] if timbre_offset + 0 < len(self.data) else 0
                 prog_bank_byte = self.data[timbre_offset + 1] if timbre_offset + 1 < len(self.data) else 0
                 
-                # Convert bank byte to bank ID
+                # Convert bank byte (PcgId) to bank ID
+                # Based on C# KronosProgramBanks.cs:
+                # I-A through I-F: 0-5
+                # GM: 6
+                # U-A through U-G: 17-23
+                # U-AA through U-GG: 24-30
                 prog_bank = "I-A"
-                if prog_bank_byte < 7:  # I-A through I-G
+                if prog_bank_byte <= 5:  # I-A through I-F (0-5)
                     prog_bank = f"I-{chr(65 + prog_bank_byte)}"
-                elif prog_bank_byte >= 0x20:  # User banks
-                    user_idx = prog_bank_byte - 0x20
-                    if user_idx < 7:
-                        prog_bank = f"U-{chr(65 + user_idx)}"
+                elif prog_bank_byte == 6:  # GM bank
+                    prog_bank = "GM"
+                elif 17 <= prog_bank_byte <= 23:  # U-A through U-G (17-23)
+                    user_idx = prog_bank_byte - 17
+                    prog_bank = f"U-{chr(65 + user_idx)}"
+                elif 24 <= prog_bank_byte <= 30:  # U-AA through U-GG (24-30)
+                    user_idx = prog_bank_byte - 24
+                    prog_bank = f"U-{chr(65 + user_idx)}{chr(65 + user_idx)}"
+                else:
+                    prog_bank = f"?-{prog_bank_byte}"  # Unknown bank
                 
                 # Status (offset +2, bits 7-5) - from C# KronosOasysTimbre.cs
                 # 0=Off, 1=Int, 2=Both, 3=Ext, 4=Ex2
