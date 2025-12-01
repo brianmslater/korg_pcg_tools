@@ -811,50 +811,43 @@ class PcgBinaryParser:
         
         debug_print(f"Parsing CBK1 at {offset:08X}, size {chunk_size:08X}")
         
-        # CBK1 structure varies - try both +24 and +40 offsets
-        # Some files have combis at +24, others at +40
-        combi_size = 7810  # Kronos combi size
-        combis = []
+        # CBK1 structure (similar to MBK1):
+        # +0: 'CBK1' (4 bytes)
+        # +4: chunk size (4 bytes, big-endian)
+        # +8: gap/header data
+        # +12: number of combis (4 bytes, big-endian)
+        # +16: size of combi (4 bytes, big-endian)
+        # +20: bank ID (4 bytes, big-endian)
+        # +24: combis start
         
-        # Try offset +24 first (older format)
+        num_combis = self.get_int(offset + 12, 4)
+        combi_size = self.get_int(offset + 16, 4)
+        bank_id_raw = self.get_int(offset + 20, 4)
+        
+        debug_print(f"  Number of combis: {num_combis}")
+        debug_print(f"  Combi size: {combi_size}")
+        debug_print(f"  Bank ID raw: 0x{bank_id_raw:08X}")
+        
+        bank_id = self._decode_bank_id(bank_id_raw, is_combi=True)
+        debug_print(f"  Decoded bank ID: {bank_id}")
+        
+        # Combis start at offset +24
+        combis = []
         scan_offset = offset + 24
-        for i in range(128):
+        
+        for i in range(min(num_combis, 128)):
             if scan_offset + 24 > len(self.data):
                 break
             name = self.get_string(scan_offset, 24)
-            if name and len(name) >= 3 and name.isprintable():
-                combis.append((i, name, scan_offset))
-                if i < 3:
-                    debug_print(f"  Found combi {i} at +24: {name}")
-                scan_offset += combi_size
-            else:
-                break
-        
-        # If no combis found at +24, try +40 (newer format)
-        if not combis:
-            scan_offset = offset + 40
-            for i in range(128):
-                if scan_offset + 24 > len(self.data):
-                    break
-                name = self.get_string(scan_offset, 24)
-                if name and len(name) >= 3 and name.isprintable():
-                    combis.append((i, name, scan_offset))
-                    if i < 3:
-                        debug_print(f"  Found combi {i} at +40: {name}")
-                    scan_offset += combi_size
-                else:
-                    break
+            if not name or len(name) < 2:
+                name = f"[Empty {i:03d}]"
+            
+            combis.append((i, name, scan_offset))
+            if i < 3:
+                debug_print(f"  Combi {i}: {name}")
+            scan_offset += combi_size
         
         if combis:
-            # Decode bank ID - try both possible locations
-            # Older format: +20, Newer format: +28
-            bank_id_raw = self.get_int(start_offset + 20, 4)
-            if bank_id_raw == 0 or bank_id_raw > 0x10000000:
-                # Try newer format
-                bank_id_raw = self.get_int(start_offset + 28, 4)
-            
-            bank_id = self._decode_bank_id(bank_id_raw, is_combi=True)
-            debug_print(f"  Decoded bank ID: {bank_id} (raw: {bank_id_raw:08X})")
             
             bank = Bank(bank_id=bank_id, bank_type='Combi')
             

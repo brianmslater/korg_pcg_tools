@@ -246,7 +246,24 @@ class PcgMainWindow(QMainWindow):
     def _create_programs_tab(self):
         """Create programs tab."""
         widget = QWidget()
-        layout = QVBoxLayout(widget)
+        main_layout = QHBoxLayout(widget)
+        
+        # Left side: Bank selector
+        bank_widget = QWidget()
+        bank_layout = QVBoxLayout(bank_widget)
+        bank_layout.addWidget(QLabel("Banks:"))
+        
+        from PySide6.QtWidgets import QListWidget
+        self.program_bank_list = QListWidget()
+        self.program_bank_list.currentRowChanged.connect(self.on_program_bank_changed)
+        bank_layout.addWidget(self.program_bank_list)
+        
+        bank_widget.setMaximumWidth(150)
+        main_layout.addWidget(bank_widget)
+        
+        # Right side: Programs
+        right_widget = QWidget()
+        layout = QVBoxLayout(right_widget)
         
         # Filter bar
         filter_layout = QHBoxLayout()
@@ -278,12 +295,31 @@ class PcgMainWindow(QMainWindow):
         
         layout.addWidget(self.programs_table)
         
+        main_layout.addWidget(right_widget)
+        
         return widget
     
     def _create_combis_tab(self):
         """Create combis tab with timbre view."""
         widget = QWidget()
-        layout = QVBoxLayout(widget)
+        main_layout = QHBoxLayout(widget)
+        
+        # Left side: Bank selector
+        bank_widget = QWidget()
+        bank_layout = QVBoxLayout(bank_widget)
+        bank_layout.addWidget(QLabel("Banks:"))
+        
+        from PySide6.QtWidgets import QListWidget
+        self.combi_bank_list = QListWidget()
+        self.combi_bank_list.currentRowChanged.connect(self.on_combi_bank_changed)
+        bank_layout.addWidget(self.combi_bank_list)
+        
+        bank_widget.setMaximumWidth(150)
+        main_layout.addWidget(bank_widget)
+        
+        # Right side: Combis and timbres
+        right_widget = QWidget()
+        layout = QVBoxLayout(right_widget)
         
         # Combis table
         self.combis_table = QTableWidget()
@@ -314,6 +350,8 @@ class PcgMainWindow(QMainWindow):
         self.timbres_table.doubleClicked.connect(self.edit_timbre)
         
         layout.addWidget(self.timbres_table, stretch=1)
+        
+        main_layout.addWidget(right_widget)
         
         return widget
     
@@ -413,6 +451,7 @@ class PcgMainWindow(QMainWindow):
                 self.welcome_widget.hide()
                 self.content_widget.show()
                 
+                self.populate_bank_lists()
                 self.load_programs()
                 self.load_combis()
                 self.load_setlists()
@@ -430,8 +469,18 @@ class PcgMainWindow(QMainWindow):
         if not self.pcg:
             return
         
+        # Get selected bank (0 = "All Banks")
+        selected_bank_index = self.program_bank_list.currentRow() if hasattr(self, 'program_bank_list') else 0
+        selected_bank_name = None
+        if selected_bank_index > 0 and hasattr(self, 'program_bank_list'):
+            selected_bank_name = self.program_bank_list.currentItem().text()
+        
         program_count = 0
         for bank in self.pcg.program_banks:
+            # Skip if filtering by bank and this isn't the selected bank
+            if selected_bank_name and bank.bank_id != selected_bank_name:
+                continue
+                
             for prog in bank.patches:
                 row = self.programs_table.rowCount()
                 self.programs_table.insertRow(row)
@@ -445,10 +494,11 @@ class PcgMainWindow(QMainWindow):
                 program_count += 1
         
         # Update status bar with count
+        bank_info = f" from bank {selected_bank_name}" if selected_bank_name else f" from {len(self.pcg.program_banks)} banks"
         if program_count == 0:
-            self.statusbar.showMessage(f"No programs found in file (found {len(self.pcg.program_banks)} program banks)")
+            self.statusbar.showMessage(f"No programs found{bank_info}")
         else:
-            self.statusbar.showMessage(f"Loaded {program_count} programs from {len(self.pcg.program_banks)} banks")
+            self.statusbar.showMessage(f"Loaded {program_count} programs{bank_info}")
     
     def load_combis(self):
         """Load combis into table."""
@@ -457,8 +507,18 @@ class PcgMainWindow(QMainWindow):
         if not self.pcg:
             return
         
+        # Get selected bank (0 = "All Banks")
+        selected_bank_index = self.combi_bank_list.currentRow() if hasattr(self, 'combi_bank_list') else 0
+        selected_bank_name = None
+        if selected_bank_index > 0 and hasattr(self, 'combi_bank_list'):
+            selected_bank_name = self.combi_bank_list.currentItem().text()
+        
         combi_count = 0
         for bank in self.pcg.combi_banks:
+            # Skip if filtering by bank and this isn't the selected bank
+            if selected_bank_name and bank.bank_id != selected_bank_name:
+                continue
+                
             for combi in bank.patches:
                 row = self.combis_table.rowCount()
                 self.combis_table.insertRow(row)
@@ -471,8 +531,9 @@ class PcgMainWindow(QMainWindow):
                 combi_count += 1
         
         # Update status bar with count
+        bank_info = f" from bank {selected_bank_name}" if selected_bank_name else f" from {len(self.pcg.combi_banks)} banks"
         if combi_count > 0:
-            self.statusbar.showMessage(f"Loaded {combi_count} combis from {len(self.pcg.combi_banks)} banks")
+            self.statusbar.showMessage(f"Loaded {combi_count} combis{bank_info}")
     
     def load_combi_timbres(self):
         """Load timbres for selected combi."""
@@ -636,6 +697,33 @@ class PcgMainWindow(QMainWindow):
             self.slots_table.setItem(row, 6, size_item)
         
         self.slots_table.blockSignals(False)
+    
+    def populate_bank_lists(self):
+        """Populate bank selector lists for programs, combis, and setlists."""
+        if not self.pcg:
+            return
+        
+        # Populate program banks
+        self.program_bank_list.clear()
+        self.program_bank_list.addItem("All Banks")
+        for bank in self.pcg.program_banks:
+            self.program_bank_list.addItem(bank.bank_id)
+        self.program_bank_list.setCurrentRow(0)
+        
+        # Populate combi banks
+        self.combi_bank_list.clear()
+        self.combi_bank_list.addItem("All Banks")
+        for bank in self.pcg.combi_banks:
+            self.combi_bank_list.addItem(bank.bank_id)
+        self.combi_bank_list.setCurrentRow(0)
+    
+    def on_program_bank_changed(self, index):
+        """Handle program bank selection change."""
+        self.load_programs()
+    
+    def on_combi_bank_changed(self, index):
+        """Handle combi bank selection change."""
+        self.load_combis()
     
     def _get_display_color(self, color_value):
         """Get QColor for display based on slot color value."""
