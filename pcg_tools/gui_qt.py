@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QTableWidget, QTableWidgetItem, QTabWidget,
     QFileDialog, QMessageBox, QComboBox, QTextEdit, QHeaderView,
-    QMenuBar, QMenu, QStatusBar
+    QMenuBar, QMenu, QStatusBar, QLineEdit, QCheckBox
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QAction, QFont
@@ -1711,9 +1711,7 @@ class PcgMainWindow(QMainWindow):
         # Remove this window from the tracking list
         if self in PcgMainWindow._open_windows:
             PcgMainWindow._open_windows.remove(self)
-
-
-def main():
+    
     def sort_bank(self):
         """Sort current bank."""
         if not self.pcg:
