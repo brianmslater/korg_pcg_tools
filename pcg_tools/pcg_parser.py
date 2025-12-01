@@ -1141,8 +1141,9 @@ class PcgBinaryParser:
                     continue
                 
                 # For SLD1, the slot IS a combi, so patch_type is always "Combi"
+                # Slots reference combis in bank I-A by default
                 patch_type = "Combi"
-                patch_bank = ""  # Setlist-specific combi bank
+                patch_bank = "I-A"  # Default to first internal combi bank
                 patch_index = slot_idx  # Slot index IS the patch index in this context
                 
                 # Color and text size are not available in SLD1 format
@@ -1183,6 +1184,7 @@ class PcgBinaryParser:
                     # Update with the combi name from SLD1
                     slot.name = sld1_name
                     slot.patch_type = patch_type
+                    slot.patch_bank = patch_bank
                     slot.patch_index = patch_index
                 
                 if slot_idx < 5:  # Debug first 5 slots
@@ -1235,12 +1237,6 @@ class PcgBinaryParser:
         
         debug_print(f"STL1 Setlist: '{setlist_name}'")
         
-        # Check if we already have setlists from SLS1 parsing
-        # If we have 16 setlists from SLS1, don't add STL1 (it's just an export)
-        if len(pcg.set_lists) >= 16:
-            debug_print("Already have 16 setlists from SLS1, skipping STL1")
-            return
-        
         # Check if we already have this setlist from SLS1 parsing
         existing_setlist = None
         for sl in pcg.set_lists:
@@ -1248,13 +1244,18 @@ class PcgBinaryParser:
                 existing_setlist = sl
                 break
         
-        # If not found, create new setlist
+        # If not found, create new setlist (only if we don't have 16 already)
         if not existing_setlist:
+            if len(pcg.set_lists) >= 16:
+                debug_print("Already have 16 setlists, skipping new setlist from STL1")
+                return
             debug_print(f"Creating new setlist from STL1: '{setlist_name}'")
             # Use next available index
             next_index = len(pcg.set_lists)
             existing_setlist = SetList(index=next_index, name=setlist_name)
             pcg.set_lists.append(existing_setlist)
+        else:
+            debug_print(f"Updating existing setlist from STL1: '{setlist_name}'")
         
         # Parse slots from STL1/SBK1
         # Start at +40 from SBK1 data start
