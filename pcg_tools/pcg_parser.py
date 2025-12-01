@@ -516,8 +516,8 @@ class PcgBinaryParser:
         if len(setlist_offsets) == 0:
             return False
         
-        # Limit to 16 setlists (Kronos has 16 setlists)
-        setlist_offsets = setlist_offsets[:16]
+        # Limit to 128 setlists (Kronos supports up to 128 setlists)
+        setlist_offsets = setlist_offsets[:128]
         
         debug_print(f"Found {len(setlist_offsets)} setlists in NEW format")
         
@@ -651,10 +651,12 @@ class PcgBinaryParser:
             pcg.has_set_lists = False
             return
         
-        # Parse as 16 setlists with 128 slots each
-        # Structure: First 16 marker entries are setlist names
-        # Then 128 slot names for each setlist (16 × 128 = 2048 slots)
-        num_setlists = 16
+        # Parse up to 128 setlists with 128 slots each
+        # Structure: First N marker entries are setlist names
+        # Then 128 slot names for each setlist
+        # Determine how many setlists we have based on the data
+        max_setlists = min(128, len(name_offsets) // 129)  # 1 name + 128 slots per setlist
+        num_setlists = max_setlists if max_setlists > 0 else 16  # Default to 16 if calculation fails
         slots_per_setlist = 128
         
         # Validate the first few names to ensure they're reasonable
@@ -1097,7 +1099,7 @@ class PcgBinaryParser:
         # Find all CBK1 markers (one per setlist)
         cbk1_positions = []
         search_pos = sld1_offset
-        while len(cbk1_positions) < 16:  # Max 16 setlists
+        while len(cbk1_positions) < 128:  # Max 128 setlists
             cbk1_pos = self.data.find(b'CBK1', search_pos)
             if cbk1_pos < 0:
                 break
@@ -1244,10 +1246,10 @@ class PcgBinaryParser:
                 existing_setlist = sl
                 break
         
-        # If not found, create new setlist (only if we don't have 16 already)
+        # If not found, create new setlist (only if we don't have 128 already)
         if not existing_setlist:
-            if len(pcg.set_lists) >= 16:
-                debug_print("Already have 16 setlists, skipping new setlist from STL1")
+            if len(pcg.set_lists) >= 128:
+                debug_print("Already have 128 setlists, skipping new setlist from STL1")
                 return
             debug_print(f"Creating new setlist from STL1: '{setlist_name}'")
             # Use next available index
