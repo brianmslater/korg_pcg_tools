@@ -22,13 +22,15 @@ class PcgBinaryParser:
         self.index = 0
     
     def get_int(self, offset: int, size: int) -> int:
-        """Read integer from data (little-endian for size, big-endian for IDs)."""
+        """Read integer from data (big-endian - Korg format)."""
         if offset + size > len(self.data):
             return 0
         
-        # For 4-byte integers, use little-endian (Korg format)
+        # Korg files use big-endian for all integers
         if size == 4:
-            return struct.unpack('<I', self.data[offset:offset+4])[0]
+            return struct.unpack('>I', self.data[offset:offset+4])[0]
+        elif size == 2:
+            return struct.unpack('>H', self.data[offset:offset+2])[0]
         
         # For other sizes, use big-endian
         value = 0
@@ -175,7 +177,8 @@ class PcgBinaryParser:
             pcg.program_banks.append(bank)
             debug_print(f"  Added bank {bank_name} with {len(bank.patches)} programs")
         
-        return start_offset + 8 + chunk_size + 12
+        # Next chunk starts after: chunk ID (4) + size (4) + chunk data (chunk_size) + gap (4)
+        return start_offset + 8 + chunk_size + 4
     
     def _parse_mbk1_chunk(self, pcg: PcgFile, offset: int) -> int:
         """Parse an MBK1 (Model Bank - for special synthesis types) chunk."""
@@ -184,45 +187,43 @@ class PcgBinaryParser:
         
         debug_print(f"Parsing MBK1 at {offset:08X}, size {chunk_size:08X}")
         
-        # MBK1 header structure varies - try both +24 and +32 offsets
-        # Some files have programs at +24, others at +32
-        program_size = 4960  # Kronos program size
-        programs = []
+        # MBK1 structure (based on C# ReadMbk1Chunk):
+        # +0: 'MBK1' (4 bytes)
+        # +4: chunk size (4 bytes, big-endian)
+        # +8: gap/header data
+        # +12: number of programs (4 bytes, big-endian)
+        # +16: size of program (4 bytes, big-endian)
+        # +20: bank ID (4 bytes, big-endian)
+        # +24: programs start
         
-        # Try offset +24 first (older format)
+        num_programs = self.get_int(offset + 12, 4)
+        program_size = self.get_int(offset + 16, 4)
+        bank_id_raw = self.get_int(offset + 20, 4)
+        
+        debug_print(f"  Number of programs: {num_programs}")
+        debug_print(f"  Program size: {program_size}")
+        debug_print(f"  Bank ID raw: 0x{bank_id_raw:08X}")
+        
+        bank_id = self._decode_bank_id(bank_id_raw, is_combi=False)
+        debug_print(f"  Decoded bank ID: {bank_id}")
+        
+        # Programs start at offset +24
+        programs = []
         scan_offset = offset + 24
-        for i in range(128):
+        
+        for i in range(min(num_programs, 128)):
             if scan_offset + 24 > len(self.data):
                 break
             name = self.get_string(scan_offset, 24)
-            if name and len(name) >= 3 and name.isprintable():
-                programs.append((i, name, scan_offset))
-                if i < 3:
-                    debug_print(f"  Found program {i} at +24: {name}")
-                scan_offset += program_size
-            else:
-                break
-        
-        # If no programs found at +24, try +32 (newer format)
-        if not programs:
-            scan_offset = offset + 32
-            for i in range(128):
-                if scan_offset + 24 > len(self.data):
-                    break
-                name = self.get_string(scan_offset, 24)
-                if name and len(name) >= 3 and name.isprintable():
-                    programs.append((i, name, scan_offset))
-                    if i < 3:
-                        debug_print(f"  Found program {i} at +32: {name}")
-                    scan_offset += program_size
-                else:
-                    break
+            if not name or len(name) < 2:
+                name = f"[Empty {i:03d}]"
+            
+            programs.append((i, name, scan_offset))
+            if i < 3:
+                debug_print(f"  Program {i}: {name}")
+            scan_offset += program_size
         
         if programs:
-            # Decode bank ID from the chunk data (at offset +20 from data start, after 8-byte header = +28 total)
-            bank_id_raw = self.get_int(start_offset + 28, 4)
-            bank_id = self._decode_bank_id(bank_id_raw, is_combi=False)
-            debug_print(f"  Decoded bank ID: {bank_id} (raw: {bank_id_raw:08X})")
             
             # Create bank
             bank = Bank(bank_id=bank_id, bank_type='Program')
@@ -253,7 +254,10 @@ class PcgBinaryParser:
             pcg.program_banks.append(bank)
             debug_print(f"  Added bank {bank_id} with {len(programs)} programs")
         
-        return start_offset + 8 + chunk_size + 12
+        # Next chunk starts after: chunk ID (4) + size (4) + chunk data (chunk_size) + gap (4)
+        next_offset = start_offset + 8 + chunk_size + 4
+        debug_print(f"  Next offset: 0x{next_offset:08X} (start=0x{start_offset:08X}, size=0x{chunk_size:08X})")
+        return next_offset
     
     def _extract_program_params(self, program_data: bytes) -> Tuple[str, Optional[Category], bool]:
         """Extract program parameters: OSC Mode, Category, and Favorite flag.
@@ -372,41 +376,53 @@ class PcgBinaryParser:
     def _decode_bank_id(self, bank_id_raw: int, is_combi: bool) -> str:
         """Decode raw bank ID to human-readable format.
         
-        Bank ID format (4 bytes):
-        - Byte 0: Bank type/engine (0x00=INT, 0x0C=EXi, etc.)
-        - Byte 1: Sub-bank (0x00=A, 0x01=B, etc.)
-        - Byte 2: Additional info
-        - Byte 3: Flags
+        Based on C# PcgFileReader.cs ProgramBankId2ProgramIndex:
+        - id == 0x8000: I-F (bank index 5)
+        - id < 0x8000: I-A through I-E (bank index 0-4)
+        - id >= 0x20000: User banks (U-A through U-GG)
         
-        Examples:
-        - 0x00000000 = I-A (Internal bank A)
-        - 0x0C000200 = I-AA (EXi bank AA)
-        - 0x0C010200 = I-AB (EXi bank AB)
+        For combis, the mapping is simpler (0-6 for I-A through I-G, 0x20000+ for user).
         """
-        # Extract bytes
-        byte0 = (bank_id_raw >> 24) & 0xFF
-        byte1 = (bank_id_raw >> 16) & 0xFF
-        byte2 = (bank_id_raw >> 8) & 0xFF
-        byte3 = bank_id_raw & 0xFF
-        
-        # Determine prefix (always I- for internal)
-        prefix = "I-"
-        
-        # Determine bank letter(s) - ALWAYS UPPERCASE
-        if byte0 == 0x00:
-            # Standard internal bank (A-G)
-            bank_letter = chr(65 + byte1).upper()  # A, B, C, etc.
-        elif byte0 == 0x0C:
-            # EXi banks use double letters (AA, AB, AC, etc.)
-            bank_letter = (chr(65 + byte1) + chr(65 + byte1)).upper()  # AA, BB, CC, etc.
-            if byte2 > 0:
-                # Sub-banks: AA, AB, AC, etc.
-                bank_letter = (chr(65 + byte1) + chr(65 + byte2)).upper()
+        if is_combi:
+            # Combi banks: I-A through I-G (0-6), U-A through U-G (0x20000-0x20006)
+            if bank_id_raw < 7:
+                return f"I-{chr(65 + bank_id_raw)}"
+            elif bank_id_raw >= 0x20000:
+                user_idx = bank_id_raw - 0x20000
+                if user_idx < 7:
+                    return f"U-{chr(65 + user_idx)}"
+                else:
+                    return f"U-{user_idx}"
+            else:
+                return f"?-{bank_id_raw:08X}"
         else:
-            # Other engine types - use simple letter
-            bank_letter = chr(65 + byte1).upper()
+            # Program banks: I-A through I-F, U-A through U-GG
+            if bank_id_raw == 0x8000:
+                # Special case: I-F
+                return "I-F"
+            elif bank_id_raw < 0x8000:
+                # I-A through I-E (0-4)
+                if bank_id_raw < 6:
+                    return f"I-{chr(65 + bank_id_raw)}"
+                else:
+                    return f"?-{bank_id_raw:08X}"
+            else:
+                # User banks (>= 0x20000)
+                if bank_id_raw >= 0x20000:
+                    user_idx = bank_id_raw - 0x20000
+                    if user_idx < 7:
+                        # U-A through U-G
+                        return f"U-{chr(65 + user_idx)}"
+                    elif user_idx < 14:
+                        # U-AA through U-GG
+                        double_idx = user_idx - 7
+                        letter = chr(65 + double_idx)
+                        return f"U-{letter}{letter}"
+                    else:
+                        return f"U-{user_idx}"
+                else:
+                    return f"?-{bank_id_raw:08X}"
         
-        result = f"{prefix}{bank_letter}"
         debug_print(f"  _decode_bank_id: raw={bank_id_raw:08X}, is_combi={is_combi}, result='{result}'")
         return result
     
