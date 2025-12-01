@@ -1279,13 +1279,19 @@ class PcgBinaryParser:
             # Text size at +29 from slot name start  
             text_size = self.data[current_offset + 29] if current_offset + 29 < len(self.data) else 0
             
-            # Patch reference at +25 (bank) and +26 (index) from name start
+            # Patch reference at +24 (type), +25 (bank) and +26 (index) from name start
             patch_bank = ""
             patch_index = 0
             patch_type = ""
             volume = 127
             
             if current_offset + 28 < len(self.data):
+                # Read patch type from byte +24, bits 1-0
+                type_byte = self.data[current_offset + 24]
+                type_value = type_byte & 0x03  # Get bits 1-0
+                type_map = {0: 'Program', 1: 'Combi', 2: 'Song'}
+                patch_type = type_map.get(type_value, 'Program')
+                
                 bank_byte = self.data[current_offset + 25]
                 index_byte = self.data[current_offset + 26]
                 volume = self.data[current_offset + 28]
@@ -1293,14 +1299,12 @@ class PcgBinaryParser:
                 # Decode bank (0-7 = I-A through I-H, 0x20+ = User banks)
                 if bank_byte < 8:
                     patch_bank = f"I-{chr(65 + bank_byte)}"
-                    patch_type = "Program"  # Internal banks are programs
                 elif bank_byte >= 0x20:
                     user_idx = bank_byte - 0x20
                     if user_idx < 8:
                         patch_bank = f"U-{chr(65 + user_idx)}"
                     else:
                         patch_bank = f"U-{user_idx}"
-                    patch_type = "Program"
                 
                 patch_index = index_byte
             
