@@ -5,6 +5,32 @@ from typing import List, Optional
 from enum import Enum
 
 
+def format_bank_id_for_display(bank_id: str) -> str:
+    """Format bank ID for display to match Kronos hardware.
+    
+    Converts internal format to Kronos display format:
+    - I-A -> INT-A
+    - U-A -> USER-A
+    - GM -> GM (unchanged)
+    - g(1)-g(9), g(d) -> unchanged
+    
+    Args:
+        bank_id: Internal bank ID (e.g., "I-A", "U-A", "GM", "g(1)")
+    
+    Returns:
+        Formatted bank ID for display (e.g., "INT-A", "USER-A", "GM", "g(1)")
+    """
+    if bank_id.startswith("I-"):
+        # Internal banks: I-A -> INT-A
+        return "INT-" + bank_id[2:]
+    elif bank_id.startswith("U-"):
+        # User banks: U-A -> USER-A
+        return "USER-" + bank_id[2:]
+    else:
+        # GM, g(1)-g(9), g(d), and other special banks remain unchanged
+        return bank_id
+
+
 class WorkstationModel(Enum):
     """Supported Korg workstation models."""
     KRONOS = "Korg Kronos"
@@ -126,8 +152,9 @@ class Program:
     
     @property
     def id(self) -> str:
-        """Return program ID like 'I-A000'."""
-        return f"{self.bank}{self.index:03d}"
+        """Return program ID like 'INT-A000'."""
+        display_bank = format_bank_id_for_display(self.bank)
+        return f"{display_bank}{self.index:03d}"
 
 
 @dataclass
@@ -154,7 +181,8 @@ class Timbre:
     @property
     def program_id(self) -> str:
         """Return referenced program ID."""
-        return f"{self.program_bank}{self.program_index:03d}"
+        display_bank = format_bank_id_for_display(self.program_bank)
+        return f"{display_bank}{self.program_index:03d}"
 
 
 @dataclass
@@ -172,8 +200,9 @@ class Combi:
     
     @property
     def id(self) -> str:
-        """Return combi ID like 'I-A000'."""
-        return f"{self.bank}{self.index:03d}"
+        """Return combi ID like 'INT-A000'."""
+        display_bank = format_bank_id_for_display(self.bank)
+        return f"{display_bank}{self.index:03d}"
 
 
 @dataclass
@@ -203,7 +232,8 @@ class SetListSlot:
     def patch_id(self) -> str:
         """Return referenced patch ID."""
         if self.patch_bank and self.patch_type:
-            return f"{self.patch_bank}{self.patch_index:03d}"
+            display_bank = format_bank_id_for_display(self.patch_bank)
+            return f"{display_bank}{self.patch_index:03d}"
         return "None"
     
     @property
@@ -473,6 +503,7 @@ class Bank:
     bank_id: str
     bank_type: str  # 'Program', 'Combi', 'SetList'
     patches: List = field(default_factory=list)
+    is_placeholder: bool = False  # True for unimplemented banks (g(1)-g(9), g(d))
     
     def __len__(self):
         return len(self.patches)

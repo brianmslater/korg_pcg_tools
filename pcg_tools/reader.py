@@ -46,7 +46,35 @@ class PcgReader:
         parser.parse_sls1_chunk(pcg)
         parser.parse_stl1_chunk(pcg)  # Parse color and text size metadata
         
+        # Add placeholder banks for unimplemented GM banks
+        self._add_placeholder_banks(pcg)
+        
         return pcg
+    
+    def _add_placeholder_banks(self, pcg: PcgFile):
+        """Add placeholder banks for g(1)-g(9) and g(d) that are not yet implemented.
+        
+        These banks exist on the Kronos hardware but are not parsed from the PCG file.
+        They are shown in the GUI with a "not implemented" message.
+        """
+        # g(1) through g(9): GM2 Main programs
+        for i in range(1, 10):
+            bank = Bank(
+                bank_id=f"g({i})",
+                bank_type="Program",
+                patches=[],
+                is_placeholder=True
+            )
+            pcg.program_banks.append(bank)
+        
+        # g(d): GM2 Drum kits
+        bank = Bank(
+            bank_id="g(d)",
+            bank_type="Program",
+            patches=[],
+            is_placeholder=True
+        )
+        pcg.program_banks.append(bank)
     
     def _parse_header(self) -> PcgHeader:
         """Parse PCG file header."""

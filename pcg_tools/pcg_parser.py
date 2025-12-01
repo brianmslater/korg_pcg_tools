@@ -373,12 +373,44 @@ class PcgBinaryParser:
         except:
             return ""
     
+    def _decode_slot_bank_id(self, bank_id: int, is_combi: bool) -> str:
+        """Decode bank ID from setlist slot data (5-bit value).
+        
+        This is different from _decode_bank_id which decodes from bank chunks.
+        Slot bank IDs are simpler: 0-7 for internal banks, 0x20+ for user banks.
+        
+        Args:
+            bank_id: 5-bit bank ID from slot data (0-31)
+            is_combi: True if this is a combi bank
+        
+        Returns:
+            Bank ID string like "I-A", "U-A", etc.
+        """
+        if bank_id < 8:
+            # Internal banks: 0-7 = I-A through I-H
+            return f"I-{chr(65 + bank_id)}"
+        elif bank_id >= 0x17:  # 23 decimal
+            # User banks start at 23 (0x17)
+            user_idx = bank_id - 0x17
+            if user_idx < 7:
+                return f"U-{chr(65 + user_idx)}"
+            else:
+                # Extended user banks (U-AA, U-BB, etc.)
+                double_idx = user_idx - 7
+                if double_idx < 7:
+                    letter = chr(65 + double_idx)
+                    return f"U-{letter}{letter}"
+                else:
+                    return f"U-{user_idx}"
+        else:
+            return f"?-{bank_id}"
+    
     def _decode_bank_id(self, bank_id_raw: int, is_combi: bool) -> str:
         """Decode raw bank ID to human-readable format.
         
         Based on C# PcgFileReader.cs ProgramBankId2ProgramIndex:
         - id == 0x8000: I-F (bank index 5)
-        - id < 0x8000: I-A through I-E (bank index 0-4)
+        - id < 0x8000: I-A through I-E (bank index 0-4), plus GM (bank index 6)
         - id >= 0x20000: User banks (U-A through U-GG)
         
         For combis, the mapping is simpler (0-6 for I-A through I-G, 0x20000+ for user).
@@ -396,8 +428,11 @@ class PcgBinaryParser:
             else:
                 return f"?-{bank_id_raw:08X}"
         else:
-            # Program banks: I-A through I-F, U-A through U-GG
-            if bank_id_raw == 0x8000:
+            # Program banks: I-A through I-F, GM, U-A through U-GG
+            if bank_id_raw == 6:
+                # GM bank (special case)
+                return "GM"
+            elif bank_id_raw == 0x8000:
                 # Special case: I-F
                 return "I-F"
             elif bank_id_raw < 0x8000:
@@ -422,9 +457,6 @@ class PcgBinaryParser:
                         return f"U-{user_idx}"
                 else:
                     return f"?-{bank_id_raw:08X}"
-        
-        debug_print(f"  _decode_bank_id: raw={bank_id_raw:08X}, is_combi={is_combi}, result='{result}'")
-        return result
     
     def parse_cmb1_chunk(self, pcg: PcgFile):
         """Parse CMB1 chunk containing combi banks."""
@@ -510,6 +542,8 @@ class PcgBinaryParser:
         
         # Find all setlists by looking for the separator
         setlist_offsets = []
+        first_setlist_offset = None
+        
         pos = sls1_offset + 8  # Start after SLS1 header
         while pos < sls1_end:
             pos = self.data.find(separator, pos)
@@ -525,9 +559,18 @@ class PcgBinaryParser:
                 if marker_offset >= sls1_offset:
                     check_marker = self.data[marker_offset:marker_offset+4]
                     if check_marker == marker:
+                        # Standard setlist with marker
                         setlist_offsets.append(marker_offset)
+                    elif first_setlist_offset is None:
+                        # First setlist without marker (e.g., "Preload Set List")
+                        # Store it separately to add at the beginning
+                        first_setlist_offset = name_offset
             
             pos += 4
+        
+        # If we found a first setlist without marker, add it at the beginning
+        if first_setlist_offset is not None:
+            setlist_offsets.insert(0, first_setlist_offset)
         
         if len(setlist_offsets) == 0:
             return False
@@ -539,8 +582,17 @@ class PcgBinaryParser:
         
         # Parse each setlist
         for sl_idx, setlist_start in enumerate(setlist_offsets):
-            # Read setlist name (skip marker, read 24 bytes)
-            name_offset = setlist_start + 4
+            # Check if this offset has a marker or not
+            has_marker = self.data[setlist_start:setlist_start+4] == marker
+            
+            # Read setlist name
+            if has_marker:
+                # Skip marker, read 24 bytes
+                name_offset = setlist_start + 4
+            else:
+                # No marker, start directly at name
+                name_offset = setlist_start
+            
             sl_name = self.get_string(name_offset, 24)
             
             if not sl_name:
@@ -1162,23 +1214,36 @@ class PcgBinaryParser:
                 if not sld1_name or len(sld1_name) < 2:
                     continue
                 
-                # For SLD1, the slot IS a combi, so patch_type is always "Combi"
-                # Slots reference combis in bank I-A by default
-                patch_type = "Combi"
-                patch_bank = "I-A"  # Default to first internal combi bank
-                patch_index = slot_idx  # Slot index IS the patch index in this context
-                
-                # Color and text size are not available in SLD1 format
-                # (they would need to be extracted from combi metadata if present)
-                color = 0
-                text_size = 0
-                
-                # Find or create the slot in our model
+                # Find the existing slot from SLS1 to get its name
                 slot = None
                 for s in setlist.slots:
                     if s.slot_index == slot_idx:
                         slot = s
                         break
+                
+                # Determine patch type from SLS1 slot name
+                # 
+                # Note: The authoritative patch type is stored in STL1/SBK1 data at
+                # byte +24 bits 1-0, but STL1 only contains data for ONE setlist per file.
+                # For setlists without STL1 data, we use the slot name as a heuristic:
+                # - If slot name is "Combi" → Combi reference
+                # - Otherwise → Program reference
+                # 
+                # This works well when users follow the naming convention of explicitly
+                # naming combi slots as "Combi", but may not work for all setlists.
+                sls1_name = slot.name if slot else ""
+                if sls1_name.strip().lower() == "combi":
+                    patch_type = "Combi"
+                    patch_bank = "I-A"  # Combis default to I-A
+                    patch_index = slot_idx
+                else:
+                    patch_type = "Program"
+                    patch_bank = "I-A"  # Programs default to I-A
+                    patch_index = slot_idx
+                
+                # Color and text size are not available in SLD1 format
+                color = 0
+                text_size = 0
                 
                 if not slot:
                     # Create new slot
@@ -1199,12 +1264,12 @@ class PcgBinaryParser:
                     setlist.slots.append(slot)
                 else:
                     # Update existing slot with SLD1 data
-                    # Save the SLS1 name as custom label (if it exists and different)
-                    if slot.name and slot.name != sld1_name:
-                        slot.description = slot.name  # Custom label from SLS1
+                    # KEEP the SLS1 name (it's the user's custom label like "SGX-2", "Combi")
+                    # The SLD1 name is the actual patch name, store it in description
+                    if sld1_name and sld1_name != slot.name:
+                        slot.description = sld1_name  # Actual patch name from SLD1
                     
-                    # Update with the combi name from SLD1
-                    slot.name = sld1_name
+                    # Update patch reference but keep the slot name from SLS1
                     slot.patch_type = patch_type
                     slot.patch_bank = patch_bank
                     slot.patch_index = patch_index
@@ -1247,131 +1312,143 @@ class PcgBinaryParser:
         # SBK1 data starts at +8 (after 'SBK1' and size)
         sbk1_data_start = sbk1_offset + 8
         
-        # Structure:
-        # +0: Header (16 bytes)
-        # +16: Setlist name (24 bytes)
-        # +40: First slot (slot 0)
-        # Each slot is ~542 bytes
+        # Each setlist structure:
+        # - 16 bytes: Header
+        # - 24 bytes: Setlist name
+        # - 128 × 542 bytes: Slots
+        # Total: 69,416 bytes per setlist
+        SETLIST_SIZE = 16 + 24 + (128 * 542)
+        SLOT_SIZE = 542
         
-        # Read setlist name
-        setlist_name_offset = sbk1_data_start + 16
-        setlist_name = self.get_string(setlist_name_offset, 24)
+        debug_print(f"Parsing all setlists from STL1 (up to 128)")
         
-        debug_print(f"STL1 Setlist: '{setlist_name}'")
-        
-        # Check if we already have this setlist from SLS1 parsing
-        existing_setlist = None
-        for sl in pcg.set_lists:
-            if sl.name == setlist_name:
-                existing_setlist = sl
-                break
-        
-        # If not found, create new setlist (only if we don't have 128 already)
-        if not existing_setlist:
-            if len(pcg.set_lists) >= 128:
-                debug_print("Already have 128 setlists, skipping new setlist from STL1")
-                return
-            debug_print(f"Creating new setlist from STL1: '{setlist_name}'")
-            # Use next available index
-            next_index = len(pcg.set_lists)
-            existing_setlist = SetList(index=next_index, name=setlist_name)
-            pcg.set_lists.append(existing_setlist)
-        else:
-            debug_print(f"Updating existing setlist from STL1: '{setlist_name}'")
-        
-        # Parse slots from STL1/SBK1
-        # Start at +40 from SBK1 data start
-        current_offset = sbk1_data_start + 40
-        
-        # Approximate slot size is 542 bytes, but we'll search for each slot
-        # to handle variable-length notes/descriptions
-        APPROX_SLOT_SIZE = 542
-        
-        # Read up to 128 slots
-        for slot_idx in range(128):
-            # Check if we have enough data
-            if current_offset + 100 > len(self.data):
+        # Parse up to 128 setlists
+        setlists_parsed = 0
+        for setlist_idx in range(128):
+            setlist_start = sbk1_data_start + (setlist_idx * SETLIST_SIZE)
+            
+            # Check if we have enough data for this setlist
+            if setlist_start + SETLIST_SIZE > len(self.data):
+                debug_print(f"Reached end of data at setlist {setlist_idx}")
                 break
             
-            # Read slot name (24 bytes)
-            slot_name = self.get_string(current_offset, 24)
+            # Read setlist name at +16
+            setlist_name = self.get_string(setlist_start + 16, 24)
             
-            # Color at +24 from slot name start
-            color = self.data[current_offset + 24] if current_offset + 24 < len(self.data) else 0
+            # Skip empty setlists
+            if not setlist_name:
+                continue
             
-            # Text size at +29 from slot name start  
-            text_size = self.data[current_offset + 29] if current_offset + 29 < len(self.data) else 0
-            
-            # Patch reference at +24 (type), +25 (bank) and +26 (index) from name start
-            patch_bank = ""
-            patch_index = 0
-            patch_type = ""
-            volume = 127
-            
-            if current_offset + 28 < len(self.data):
-                # Read patch type from byte +24, bits 1-0
-                type_byte = self.data[current_offset + 24]
-                type_value = type_byte & 0x03  # Get bits 1-0
-                type_map = {0: 'Program', 1: 'Combi', 2: 'Song'}
-                patch_type = type_map.get(type_value, 'Program')
-                
-                bank_byte = self.data[current_offset + 25]
-                index_byte = self.data[current_offset + 26]
-                volume = self.data[current_offset + 28]
-                
-                # Decode bank (0-7 = I-A through I-H, 0x20+ = User banks)
-                if bank_byte < 8:
-                    patch_bank = f"I-{chr(65 + bank_byte)}"
-                elif bank_byte >= 0x20:
-                    user_idx = bank_byte - 0x20
-                    if user_idx < 8:
-                        patch_bank = f"U-{chr(65 + user_idx)}"
-                    else:
-                        patch_bank = f"U-{user_idx}"
-                
-                patch_index = index_byte
-            
-            # Find or create slot
-            slot = None
-            for s in existing_setlist.slots:
-                if s.slot_index == slot_idx:
-                    slot = s
+            # Find existing setlist from SLS1 parsing
+            existing_setlist = None
+            for sl in pcg.set_lists:
+                if sl.name == setlist_name or sl.index == setlist_idx:
+                    existing_setlist = sl
                     break
             
-            if not slot and slot_name:
-                # Create new slot
-                slot = SetListSlot(
-                    set_list_index=existing_setlist.index,
-                    slot_index=slot_idx,
-                    name=slot_name,
-                    color=color,
-                    patch_type=patch_type,
-                    patch_bank=patch_bank,
-                    patch_index=patch_index
-                )
-                # Set properties after creation (C# pattern)
-                slot._text_size = text_size
-                slot._volume = volume
-                slot._transpose = 0
-                existing_setlist.slots.append(slot)
-            elif slot:
-                # Update existing slot with STL1 data
-                if slot_name:
-                    slot.name = slot_name
-                slot.color = color
-                slot._text_size = text_size
-                if patch_type:
-                    slot.patch_type = patch_type
-                    slot.patch_bank = patch_bank
-                    slot.patch_index = patch_index
-                    slot.volume = volume
+            # If not found, create new setlist
+            if not existing_setlist:
+                debug_print(f"Creating new setlist {setlist_idx}: '{setlist_name}'")
+                existing_setlist = SetList(index=setlist_idx, name=setlist_name)
+                pcg.set_lists.append(existing_setlist)
+            else:
+                debug_print(f"Updating setlist {setlist_idx}: '{setlist_name}'")
             
-            if slot_name:
-                debug_print(f"Slot {slot_idx}: '{slot_name}' color={color} size={text_size}")
+            # Parse 128 slots for this setlist
+            first_slot_offset = setlist_start + 40
+            for slot_idx in range(128):
+                slot_offset = first_slot_offset + (slot_idx * SLOT_SIZE)
+                
+                # Check if we have enough data
+                if slot_offset + 30 > len(self.data):
+                    break
+                
+                # Read slot name (24 bytes)
+                slot_name = self.get_string(slot_offset, 24)
+                
+                # Color at +24 from slot name start
+                color = self.data[slot_offset + 24] if slot_offset + 24 < len(self.data) else 0
+                
+                # Text size at +29 from slot name start  
+                text_size = self.data[slot_offset + 29] if slot_offset + 29 < len(self.data) else 0
+                
+                # Patch reference at +24 (type), +25 (bank) and +26 (index) from name start
+                patch_bank = ""
+                patch_index = 0
+                patch_type = ""
+                volume = 127
+                
+                if slot_offset + 28 < len(self.data):
+                    # Read patch type from byte +24, bits 1-0
+                    type_byte = self.data[slot_offset + 24]
+                    type_value = type_byte & 0x03  # Get bits 1-0
+                    type_map = {0: 'Program', 1: 'Combi', 2: 'Song'}
+                    patch_type = type_map.get(type_value, 'Program')
+                    
+                    bank_byte = self.data[slot_offset + 25]
+                    index_byte = self.data[slot_offset + 26]
+                    volume = self.data[slot_offset + 28]
+                    
+                    # Decode bank ID from bits 4-0 of byte 25
+                    bank_id = bank_byte & 0x1F  # Extract bits 4-0
+                    
+                    # Bank mapping:
+                    # 0-4: INT-A through INT-E
+                    # 5-11: USER-A through USER-G  
+                    # 12: GM
+                    if bank_id <= 4:
+                        patch_bank = f"I-{chr(65 + bank_id)}"  # INT-A to INT-E
+                    elif 5 <= bank_id <= 11:
+                        patch_bank = f"U-{chr(65 + (bank_id - 5))}"  # USER-A to USER-G
+                    elif bank_id == 12:
+                        patch_bank = "GM"
+                    else:
+                        patch_bank = f"?{bank_id}"
+                    
+                    patch_index = index_byte
+                
+                # Find or create slot
+                slot = None
+                for s in existing_setlist.slots:
+                    if s.slot_index == slot_idx:
+                        slot = s
+                        break
+                
+                if not slot and slot_name:
+                    # Create new slot
+                    slot = SetListSlot(
+                        set_list_index=existing_setlist.index,
+                        slot_index=slot_idx,
+                        name=slot_name,
+                        color=color,
+                        patch_type=patch_type,
+                        patch_bank=patch_bank,
+                        patch_index=patch_index
+                    )
+                    # Set properties after creation (C# pattern)
+                    slot._text_size = text_size
+                    slot._volume = volume
+                    slot._transpose = 0
+                    existing_setlist.slots.append(slot)
+                elif slot:
+                    # Update existing slot with STL1 data
+                    # STL1 is the authoritative source - always override with its data
+                    if slot_name:
+                        slot.name = slot_name
+                    slot.color = color
+                    slot._text_size = text_size
+                    
+                    # Always update patch reference from STL1 (it's the correct source)
+                    if patch_type:
+                        slot.patch_type = patch_type
+                    if patch_bank:
+                        slot.patch_bank = patch_bank
+                    if patch_index is not None:
+                        slot.patch_index = patch_index
+                    if volume:
+                        slot.volume = volume
             
-            # Move to next slot
-            # Use approximate slot size
-            current_offset += APPROX_SLOT_SIZE
+            setlists_parsed += 1
         
-        debug_print(f"Finished parsing STL1: {len(existing_setlist.slots)} slots")
+        debug_print(f"Finished parsing STL1: {setlists_parsed} setlists")
         pcg.has_set_lists = len(pcg.set_lists) > 0
