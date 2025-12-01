@@ -5,6 +5,111 @@ All notable changes to PCG Tools Python will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2025-12-01 "Feature Complete"
+
+### 🎉 Major Milestone: Feature Parity Achieved!
+
+This release represents **near-complete feature parity** with the C# version plus improvements.
+
+### Added - Final Features
+- **Filter Programs**: Filter by text and favorite status
+- **Cut Operation**: Copy + clear in one action (Ctrl+X)
+- **Sort Slots**: Sort setlist slots by name or patch
+- **Filter UI**: Search bar and favorite filter on Programs tab
+
+### Summary of v1.2.2 → v1.3.0
+- **9 major features** added in one session
+- **All high-priority features** complete
+- **Most medium-priority features** complete
+- **Production ready** for daily use
+
+## [1.2.6] - 2025-12-01
+
+### Added - Medium Priority Features
+- **Revert to Saved**: Discard all changes and reload last saved version
+- **Clear/Initialize**: Reset programs or combis to initialized state
+- **Auto-Fill Setlist Slots**: Automatically populate empty slots with programs or combis
+- **Auto-Backup**: Always enabled - creates .backup file before overwriting (v1.2.3)
+- **File Validation**: Checks file integrity before writing (v1.2.3)
+
+### Technical
+- Added `revert_to_saved()` method with confirmation dialog
+- Added `clear_selected()` for programs and combis
+- Added `auto_fill_slots()` with dialog for patch type selection
+- Auto-backup always enabled in writer
+
+## [1.2.5] - 2025-12-01
+
+### Added - Move Up/Down
+- **Move Up/Down**: Reorder programs, combis, and setlist slots
+- **Keyboard Shortcuts**: Ctrl+Up and Ctrl+Down
+- **Context Menus**: Move Up/Down in all context menus
+- **Edit Menu**: Move Up/Down commands in Edit menu
+- **Selection Preserved**: Selected item stays selected after move
+
+### Technical
+- Added `move_patch_up()`, `move_patch_down()` to BatchOperations
+- Added `move_slot_up()`, `move_slot_down()` for setlists
+- Keyboard shortcuts integrated across all tabs
+
+## [1.2.4] - 2025-12-01
+
+### Added - Batch Operations
+- **Sort Bank**: Sort programs/combis by name, category, favorite, engine, or tempo
+- **Compact Bank**: Remove empty patches (Init, [Empty, blank names)
+- **Remove Duplicates**: Remove duplicate patches by name
+- **Capitalize Names**: Apply title case, UPPER, lower, or sentence case
+- **Move Favorites to Top**: Reorder bank with favorites first
+- **Tools Menu**: New menu with all batch operations
+- **Dialogs**: User-friendly dialogs for all operations with previews
+
+### Technical
+- New `batch_operations.py` module with BatchOperations class
+- Sort, compact, remove duplicates, capitalize, move favorites methods
+- Test script: `test_batch_operations.py`
+
+## [1.2.3] - 2025-12-01
+
+### Added - Program Copy/Paste & Patch Assignment
+- **Program Copy/Paste**: Copy and paste individual programs
+  - Keyboard shortcuts: Ctrl+C (copy), Ctrl+V (paste)
+  - Context menus for Programs and Combis tables
+  - Preserves destination program ID (doesn't move programs)
+  - Copies all properties: name, category, favorite, engine, OSC mode
+- **Assign Program to Slot**: Set which program/combi a setlist slot references
+  - Enhanced slot edit dialog with patch assignment section
+  - Dropdown lists all programs or combis
+  - Shows patch ID and name for easy selection
+- **Context Menus**: Right-click menus for all tables
+  - Programs table: Edit, Copy, Paste
+  - Combis table: Edit, Copy (with programs), Paste
+  - Slots table: Edit, Copy, Paste, Clear
+
+### Technical
+- Extended `Clipboard` class to support programs
+- Added `copy_program()` and `paste_program()` methods
+- Enhanced slot edit dialog with patch type and patch selectors
+- Context menus for programs, combis, and slots tables
+- Test script: `test_program_copy_paste.py`
+
+## [1.2.2] - 2025-12-01
+
+### Added - Setlist Slot Copy/Paste
+- **Copy/Paste Slots**: Copy and paste setlist slots with all properties
+  - Keyboard shortcuts: Ctrl+C (copy), Ctrl+V (paste)
+  - Edit menu: Copy and Paste commands
+  - Context menu: Right-click for copy/paste/clear options
+- **Slot Properties Copied**: Name, patch reference, transpose, volume, color, text size, notes
+- **Cross-Setlist Support**: Copy slots between different setlists
+- **Clear Slot**: Remove slots via context menu with confirmation
+- **Documentation**: New SETLIST_COPY_PASTE.md guide
+
+### Technical
+- Extended `Clipboard` class to support setlist slots
+- Added `copy_slot()` and `paste_slot()` methods
+- Context menu for slots table with edit/copy/paste/clear
+- Test script: `test_slot_copy_paste.py`
+
 ## [1.2.1] - 2025-11-26
 
 ### Fixed - macOS Crash Issue

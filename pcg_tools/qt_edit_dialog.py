@@ -263,3 +263,181 @@ class QtEditPatchDialog(QDialog):
     def get_result(self):
         """Return whether user clicked OK."""
         return self.result
+
+
+
+class QtEditTimbreDialog(QDialog):
+    """Qt-based edit dialog for combi timbres."""
+    
+    def __init__(self, parent, timbre, combi):
+        super().__init__(parent)
+        self.timbre = timbre
+        self.combi = combi
+        self.result = False
+        
+        self.setWindowTitle(f"Edit Timbre - {combi.name}")
+        self.setMinimumWidth(500)
+        self.setModal(True)
+        
+        self._create_widgets()
+        self._load_values()
+    
+    def _create_widgets(self):
+        """Create dialog widgets."""
+        layout = QVBoxLayout(self)
+        
+        # Form layout for fields
+        form = QFormLayout()
+        
+        # Program reference (read-only)
+        program_label = QLabel(self.timbre.program_id)
+        program_label.setStyleSheet("font-weight: bold;")
+        form.addRow("Program:", program_label)
+        
+        # Status
+        self.status_combo = QComboBox()
+        self.status_combo.addItems(["Off", "Int", "Both", "Ext", "Ex2"])
+        self.status_combo.setCurrentText(self.timbre.status)
+        form.addRow("Status:", self.status_combo)
+        
+        # MIDI Channel (display as 1-16)
+        self.midi_ch_spin = QSpinBox()
+        self.midi_ch_spin.setRange(1, 16)
+        self.midi_ch_spin.setValue(self.timbre.midi_channel + 1)
+        form.addRow("MIDI Channel:", self.midi_ch_spin)
+        
+        # Volume
+        self.volume_spin = QSpinBox()
+        self.volume_spin.setRange(0, 127)
+        self.volume_spin.setValue(self.timbre.volume)
+        form.addRow("Volume:", self.volume_spin)
+        
+        # Transpose
+        self.transpose_spin = QSpinBox()
+        self.transpose_spin.setRange(-128, 127)
+        self.transpose_spin.setValue(self.timbre.transpose)
+        form.addRow("Transpose:", self.transpose_spin)
+        
+        # Mute
+        self.mute_check = QCheckBox("Mute this timbre")
+        self.mute_check.setChecked(self.timbre.mute)
+        form.addRow("", self.mute_check)
+        
+        # Key Zone
+        key_zone_layout = QHBoxLayout()
+        self.bottom_key_spin = QSpinBox()
+        self.bottom_key_spin.setRange(0, 127)
+        self.bottom_key_spin.setValue(self.timbre.bottom_key)
+        key_zone_layout.addWidget(QLabel("Bottom:"))
+        key_zone_layout.addWidget(self.bottom_key_spin)
+        key_zone_layout.addWidget(QLabel("Top:"))
+        self.top_key_spin = QSpinBox()
+        self.top_key_spin.setRange(0, 127)
+        self.top_key_spin.setValue(self.timbre.top_key)
+        key_zone_layout.addWidget(self.top_key_spin)
+        form.addRow("Key Zone:", key_zone_layout)
+        
+        # Velocity Zone
+        vel_zone_layout = QHBoxLayout()
+        self.bottom_vel_spin = QSpinBox()
+        self.bottom_vel_spin.setRange(1, 127)
+        self.bottom_vel_spin.setValue(self.timbre.bottom_velocity)
+        vel_zone_layout.addWidget(QLabel("Bottom:"))
+        vel_zone_layout.addWidget(self.bottom_vel_spin)
+        vel_zone_layout.addWidget(QLabel("Top:"))
+        self.top_vel_spin = QSpinBox()
+        self.top_vel_spin.setRange(1, 127)
+        self.top_vel_spin.setValue(self.timbre.top_velocity)
+        vel_zone_layout.addWidget(self.top_vel_spin)
+        form.addRow("Velocity Zone:", vel_zone_layout)
+        
+        # Add form to main layout
+        layout.addLayout(form)
+        
+        # Buttons
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        
+        cancel_button = QPushButton("Cancel")
+        cancel_button.clicked.connect(self.reject)
+        button_layout.addWidget(cancel_button)
+        
+        ok_button = QPushButton("OK")
+        ok_button.setDefault(True)
+        ok_button.clicked.connect(self._on_ok)
+        button_layout.addWidget(ok_button)
+        
+        layout.addLayout(button_layout)
+    
+    def _load_values(self):
+        """Load current values into widgets."""
+        # Already done in _create_widgets
+        pass
+    
+    def _on_ok(self):
+        """Handle OK button."""
+        # Update timbre properties
+        self.timbre.status = self.status_combo.currentText()
+        self.timbre.midi_channel = self.midi_ch_spin.value() - 1  # Convert back to 0-15
+        self.timbre.volume = self.volume_spin.value()
+        self.timbre.transpose = self.transpose_spin.value()
+        self.timbre.mute = self.mute_check.isChecked()
+        self.timbre.bottom_key = self.bottom_key_spin.value()
+        self.timbre.top_key = self.top_key_spin.value()
+        self.timbre.bottom_velocity = self.bottom_vel_spin.value()
+        self.timbre.top_velocity = self.top_vel_spin.value()
+        
+        # Update raw_data
+        self._update_raw_data()
+        
+        self.result = True
+        self.accept()
+    
+    def _update_raw_data(self):
+        """Update the combi raw_data with timbre changes."""
+        if not self.combi.raw_data:
+            return
+        
+        raw_data = bytearray(self.combi.raw_data)
+        
+        # Find which timbre this is (0-15)
+        timbre_index = self.combi.timbres.index(self.timbre)
+        
+        # Calculate timbre offset
+        # From C# KronosTimbres.cs: TimbresOffsetConstant = 4802
+        # Each timbre is 188 bytes
+        timbre_base = 4802
+        timbre_offset = timbre_base + (timbre_index * 188)
+        
+        if timbre_offset + 188 > len(raw_data):
+            return
+        
+        # Update timbre parameters based on verified offsets
+        # Status (offset +2, bits 7-5) and MIDI Channel (offset +2, bits 4-0)
+        status_value = ["Off", "Int", "Both", "Ext", "Ex2"].index(self.timbre.status)
+        byte_2 = (status_value << 5) | (self.timbre.midi_channel & 0x1F)
+        raw_data[timbre_offset + 2] = byte_2
+        
+        # Volume (offset +5)
+        raw_data[timbre_offset + 5] = self.timbre.volume
+        
+        # Transpose (offset +7, signed)
+        transpose_byte = self.timbre.transpose if self.timbre.transpose >= 0 else (256 + self.timbre.transpose)
+        raw_data[timbre_offset + 7] = transpose_byte
+        
+        # Mute (offset +34, bit 7)
+        if self.timbre.mute:
+            raw_data[timbre_offset + 34] |= 0x80
+        else:
+            raw_data[timbre_offset + 34] &= 0x7F
+        
+        # Key zones (offset +37/+38)
+        raw_data[timbre_offset + 37] = self.timbre.top_key
+        raw_data[timbre_offset + 38] = self.timbre.bottom_key
+        
+        # Velocity zones (offset +40/+41)
+        raw_data[timbre_offset + 40] = self.timbre.top_velocity
+        raw_data[timbre_offset + 41] = self.timbre.bottom_velocity
+        
+        # Update combi raw_data
+        self.combi.raw_data = bytes(raw_data)

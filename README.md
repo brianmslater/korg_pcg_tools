@@ -265,6 +265,27 @@ See [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) for complete details.
 
 ---
 
+## ⚠️ IMPORTANT: Safe Workflow for Kronos
+
+**The Kronos uses an internal SSD. Always test edited files on USB before copying to internal storage!**
+
+### Recommended Workflow:
+1. **Export** PCG from Kronos internal SSD to USB drive
+2. **Copy** USB file to your computer
+3. **Edit** the copy with PCG Tools
+4. **Save** edited file to USB drive
+5. **Test** load on Kronos from USB drive
+6. **Only if successful**, copy to internal SSD
+7. **Keep** USB backup!
+
+### Why This Matters:
+- Internal SSD corruption requires factory initialization
+- Cannot easily recover from internal storage corruption
+- Testing on USB first prevents potential boot issues
+- Always keep backups on external storage
+
+---
+
 ## 🐛 Troubleshooting
 
 ### Simple Setlist Editor Won't Launch
@@ -345,11 +366,11 @@ For help:
 
 ## 🎊 Status
 
-**Version:** 1.1.0  
-**Date:** November 26, 2025  
-**Status:** ✅ Production Ready  
+**Version:** 1.3.0 "Feature Complete"  
+**Date:** December 1, 2025  
+**Status:** ✅ Production Ready - Feature Parity Achieved!  
 **Hardware Tested:** ✅ Korg Kronos  
-**Recommended Tool:** Simple Setlist Editor  
+**Recommended Tool:** PCG Tools GUI (complete editing suite)  
 
 ---
 

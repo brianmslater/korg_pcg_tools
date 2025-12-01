@@ -140,8 +140,12 @@ class Timbre:
     volume: int = 127
     pan: int = 64
     mute: bool = False
+    priority: bool = False  # Priority flag
     detune: int = 0  # Detune in cents (signed, -1200 to +1200)
     transpose: int = 0  # Transpose in semitones (signed, -24 to +24)
+    portamento: int = 0  # Portamento (signed, -128 to +127)
+    osc_mode: str = "Prg"  # Oscillator mode: Prg, Poly, Mono, Legato
+    osc_select: str = "Both"  # Oscillator select: Both, Osc1, Osc2
     bottom_key: int = 0  # Bottom key of zone (0-127, C-1 to G9)
     top_key: int = 127  # Top key of zone (0-127, C-1 to G9)
     bottom_velocity: int = 1  # Bottom velocity (1-127)

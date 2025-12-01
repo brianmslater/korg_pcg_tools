@@ -1,8 +1,10 @@
 """PCG file writer."""
 
 import struct
+import shutil
 from pathlib import Path
 from .models import PcgFile
+from .checksum import fix_all_checksums
 
 
 class PcgWriter:
@@ -11,15 +13,58 @@ class PcgWriter:
     def __init__(self, pcg: PcgFile):
         self.pcg = pcg
     
-    def write(self, filepath: str):
-        """Write PCG file to disk."""
+    def write(self, filepath: str, create_backup: bool = True):
+        """Write PCG file to disk.
+        
+        Args:
+            filepath: Path to write the file
+            create_backup: If True and file exists, create .backup file first
+        """
         # Update raw_data with any modified patch data before writing
         if self.pcg.raw_data:
+            # Validate file before writing
+            if not self._validate_pcg_data():
+                raise ValueError("PCG data validation failed - file may be corrupted")
+            
+            # Create backup if file exists
+            if create_backup and Path(filepath).exists():
+                backup_path = f"{filepath}.backup"
+                shutil.copy2(filepath, backup_path)
+            
             self._update_raw_data()
+            
+            # Fix checksums before writing (CRITICAL!)
+            raw_data = bytearray(self.pcg.raw_data)
+            fix_all_checksums(raw_data)
+            self.pcg.raw_data = bytes(raw_data)
+            
             with open(filepath, 'wb') as f:
                 f.write(self.pcg.raw_data)
         else:
             raise NotImplementedError("Creating new PCG files from scratch not yet implemented")
+    
+    def _validate_pcg_data(self) -> bool:
+        """Validate PCG data before writing.
+        
+        Returns:
+            True if data appears valid
+        """
+        if not self.pcg.raw_data:
+            return False
+        
+        # Check minimum file size (PCG files are typically > 100KB)
+        if len(self.pcg.raw_data) < 10000:
+            return False
+        
+        # Check for KORG magic number at start
+        if self.pcg.raw_data[:4] != b'KORG':
+            return False
+        
+        # Check for PCG1 chunk
+        if b'PCG1' not in self.pcg.raw_data[:1000]:
+            return False
+        
+        return True
     
     def _update_raw_data(self):
         """Update the PCG raw_data with modified patch data.
@@ -32,53 +77,116 @@ class PcgWriter:
         
         raw_data = bytearray(self.pcg.raw_data)
         
-        # Update program data
+        # Update program names directly in raw_data
         for bank in self.pcg.program_banks:
             for prog in bank.patches:
-                if prog.raw_data and hasattr(prog, '_raw_offset'):
-                    # If we tracked the offset, update it in place
+                if hasattr(prog, '_raw_offset') and prog._raw_offset > 0:
+                    # Program name is at offset 0 in the program data (first 24 bytes)
                     offset = prog._raw_offset
-                    if offset + len(prog.raw_data) <= len(raw_data):
-                        raw_data[offset:offset+len(prog.raw_data)] = prog.raw_data
+                    name_bytes = prog.name.encode('ascii', errors='ignore')[:24]
+                    name_bytes = name_bytes.ljust(24, b'\x00')
+                    raw_data[offset:offset+24] = name_bytes
         
-        # Update combi data
+        # Update combi names and timbres directly in raw_data
         for bank in self.pcg.combi_banks:
             for combi in bank.patches:
-                if combi.raw_data and hasattr(combi, '_raw_offset'):
-                    # If we tracked the offset, update it in place
+                if hasattr(combi, '_raw_offset') and combi._raw_offset > 0:
+                    # Combi name is at offset 0 in the combi data (first 24 bytes)
                     offset = combi._raw_offset
-                    if offset + len(combi.raw_data) <= len(raw_data):
-                        raw_data[offset:offset+len(combi.raw_data)] = combi.raw_data
+                    name_bytes = combi.name.encode('ascii', errors='ignore')[:24]
+                    name_bytes = name_bytes.ljust(24, b'\x00')
+                    raw_data[offset:offset+24] = name_bytes
+                    
+                    # Update timbre data
+                    self._update_timbre_data(raw_data, combi)
         
         # Update ALL chunks to keep them in sync
         self._update_all_setlist_chunks(raw_data)
         
         self.pcg.raw_data = bytes(raw_data)
     
+    def _update_timbre_data(self, raw_data: bytearray, combi):
+        """Update timbre properties in combi raw data.
+        
+        Timbre structure (from C# KronosTimbres.cs and Timbre.cs):
+        - Timbre base offset: 4802 (from C# KronosTimbres.cs: TimbresOffsetConstant)
+        - Timbre size: 188 bytes (from C# KronosTimbre.cs: TimbresSizeConstant)
+        - Offset +2: Status (bits 7-5) and MIDI channel (bits 4-0)
+        - Offset +5: Volume (bits 7-0)
+        - Offset +7: Transpose (bits 7-0, signed)
+        - Offset +8: Detune (2 bytes, signed, little-endian)
+        - Offset +34: Mute (bit 7)
+        - Offset +37: Top Key
+        - Offset +38: Bottom Key
+        - Offset +40: Top Velocity
+        - Offset +41: Bottom Velocity
+        """
+        if not hasattr(combi, '_raw_offset') or combi._raw_offset <= 0:
+            return
+        
+        # CRITICAL FIX: Timbre data starts at offset 4802 (not 1024!)
+        # From C# KronosTimbres.cs: TimbresOffsetConstant => 4802
+        timbre_base = combi._raw_offset + 4802
+        timbre_size = 188  # From C# KronosTimbre.cs: TimbresSizeConstant
+        
+        for i, timbre in enumerate(combi.timbres):
+            if i >= 16:  # Max 16 timbres
+                break
+            
+            timbre_offset = timbre_base + (i * timbre_size)
+            
+            # Verify we're in bounds
+            if timbre_offset + 42 > len(raw_data):
+                break
+            
+            # Update Status (offset +2, bits 7-5) and MIDI channel (offset +2, bits 4-0)
+            status_value = ["Off", "Int", "Both", "Ext", "Ex2"].index(timbre.status) if timbre.status in ["Off", "Int", "Both", "Ext", "Ex2"] else 1
+            byte_2 = (status_value << 5) | (timbre.midi_channel & 0x1F)
+            raw_data[timbre_offset + 2] = byte_2
+            
+            # Update volume (offset +5, bits 7-0)
+            raw_data[timbre_offset + 5] = timbre.volume & 0xFF
+            
+            # Update transpose (offset +7, bits 7-0, signed)
+            transpose_byte = timbre.transpose if timbre.transpose >= 0 else (256 + timbre.transpose)
+            raw_data[timbre_offset + 7] = transpose_byte & 0xFF
+            
+            # Update detune (offset +8, 2 bytes, signed, little-endian)
+            detune_bytes = struct.pack('<h', timbre.detune)
+            raw_data[timbre_offset + 8:timbre_offset + 10] = detune_bytes
+            
+            # Update mute (offset +34, bit 7)
+            if timbre.mute:
+                raw_data[timbre_offset + 34] |= 0x80
+            else:
+                raw_data[timbre_offset + 34] &= 0x7F
+            
+            # Update key zones (offset +37/+38)
+            raw_data[timbre_offset + 37] = timbre.top_key & 0xFF
+            raw_data[timbre_offset + 38] = timbre.bottom_key & 0xFF
+            
+            # Update velocity zones (offset +40/+41)
+            raw_data[timbre_offset + 40] = timbre.top_velocity & 0xFF
+            raw_data[timbre_offset + 41] = timbre.bottom_velocity & 0xFF
+    
     def _update_all_setlist_chunks(self, raw_data: bytearray):
-        """Update setlist names in SLS1 chunk only.
+        """Update setlist names in both SLS1 and STL1 chunks.
         
-        CRITICAL FINDING (Nov 25, 2025):
-        - SLS1 (new format) - Parser reads from here, MUST be updated
-        - SBK1 (old format) - MUST NOT be changed! Changing it breaks file validation
+        CRITICAL FINDING (Nov 27, 2025):
+        - Must update BOTH SLS1 and STL1 for names to change on hardware
+        - Must recalculate checksums after editing (done in write() method)
+        - Without checksums, file becomes corrupted
         
-        Hardware testing proved:
-        - ✅ Kronos ACCEPTS files with mismatched SLS1/SBK1 names
-        - ❌ Kronos REJECTS files when we CHANGE the SBK1 name
-        - ✅ SLS1-only updates work perfectly
-        
-        The SBK1 chunk has hidden validation (checksum/CRC/references) that we
-        don't understand. Changing it breaks the file. Solution: only update SLS1.
+        With checksum fixing, both updates work correctly!
         """
         if not self.pcg.set_lists:
             return
         
-        # Update ONLY SLS1 (new format - what parser reads and displays)
+        # Update SLS1 (for parser consistency)
         self._update_sls1_names(raw_data)
         
-        # DO NOT update SBK1! Changing it breaks file validation.
-        # The original file has mismatched names and works fine.
-        # self._update_sbk1_names(raw_data)  # DISABLED - breaks files!
+        # Update STL1/SBK1 (what Kronos actually reads)
+        self._update_stl1_data(raw_data)
     
     def _update_sls1_names(self, raw_data: bytearray):
         """Update setlist names in SLS1 chunk (new format).
@@ -347,10 +455,16 @@ class PcgWriter:
         return bytes(header)
 
 
-def write_pcg_file(pcg: PcgFile, filepath: str):
-    """Convenience function to write a PCG file."""
+def write_pcg_file(pcg: PcgFile, filepath: str, create_backup: bool = True):
+    """Convenience function to write a PCG file.
+    
+    Args:
+        pcg: PCG file object to write
+        filepath: Path to write the file
+        create_backup: If True, create .backup file before overwriting (default: True)
+    """
     writer = PcgWriter(pcg)
-    writer.write(filepath)
+    writer.write(filepath, create_backup=create_backup)
 
 
 def create_blank_pcg(output_path: str, num_program_banks: int = 1, num_combi_banks: int = 1):

@@ -14,6 +14,9 @@ from pcg_tools.reader import read_pcg_file
 from pcg_tools.writer import write_pcg_file
 from pcg_tools.models import SLOT_COLOR_VALUES, SlotTextSize
 
+# Version
+VERSION = "1.3.0"
+
 # Configuration file location
 CONFIG_FILE = Path.home() / '.pcg_tools_simple_editor.json'
 MAX_RECENT_FILES = 10
@@ -100,6 +103,11 @@ class SimpleSetlistEditor:
         help_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Help", menu=help_menu)
         help_menu.add_command(label="About", command=self.show_about)
+        
+        # Help menu
+        help_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Help", menu=help_menu)
+        help_menu.add_command(label="About", command=self.show_about)
     
     def update_recent_files_menu(self):
         """Update the recent files menu."""
@@ -128,7 +136,7 @@ class SimpleSetlistEditor:
         """Show about dialog."""
         messagebox.showinfo(
             "About Simple Setlist Editor",
-            "Simple Setlist Editor v1.1\n\n"
+            f"Simple Setlist Editor v{VERSION}\n\n"
             "A clean, reliable GUI for editing PCG setlists.\n"
             "Hardware tested on Korg Kronos.\n\n"
             "Features:\n"
@@ -139,7 +147,7 @@ class SimpleSetlistEditor:
             "• Recent files list\n"
             "• Window position memory\n\n"
             "Part of PCG Tools Python\n"
-            "https://github.com/yourusername/pcg-tools"
+            "https://github.com/brianmslater/korg_pcg_tools"
         )
     
     def setup_context_menu(self):

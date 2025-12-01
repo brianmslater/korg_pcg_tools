@@ -923,10 +923,10 @@ class PcgBinaryParser:
         
         timbres = []
         
-        # Timbre data starts around offset 1024 in Kronos combis
-        # Each timbre is approximately 400 bytes
-        timbre_base = combi_offset + 1024
-        timbre_size = 400
+        # Timbre data starts at offset 4802 in Kronos combis (from C# KronosTimbres.cs: TimbresOffsetConstant)
+        # Each timbre is 188 bytes (from C# KronosTimbre.cs: TimbresSizeConstant)
+        timbre_base = combi_offset + 4802
+        timbre_size = 188
         
         for i in range(16):  # 16 timbres per combi
             timbre_offset = timbre_base + (i * timbre_size)
@@ -935,19 +935,10 @@ class PcgBinaryParser:
                 break
             
             try:
-                # Parse timbre status (offset +0)
-                # 0 = OFF, 1 = INT, 2 = EXi, etc.
-                status_byte = self.data[timbre_offset]
-                status = "OFF"
-                if status_byte == 1:
-                    status = "INT"
-                elif status_byte == 2:
-                    status = "EXi"
-                
-                # Parse program reference (offset +4 and +5)
-                # Bank ID is at +4 (1 byte), Program number at +5 (1 byte)
-                prog_bank_byte = self.data[timbre_offset + 4] if timbre_offset + 4 < len(self.data) else 0
-                prog_num_byte = self.data[timbre_offset + 5] if timbre_offset + 5 < len(self.data) else 0
+                # Parse program reference (offset +0 and +1 per C# code)
+                # Program number at +0, Bank ID at +1
+                prog_num_byte = self.data[timbre_offset + 0] if timbre_offset + 0 < len(self.data) else 0
+                prog_bank_byte = self.data[timbre_offset + 1] if timbre_offset + 1 < len(self.data) else 0
                 
                 # Convert bank byte to bank ID
                 prog_bank = "I-A"
@@ -958,36 +949,73 @@ class PcgBinaryParser:
                     if user_idx < 7:
                         prog_bank = f"U-{chr(65 + user_idx)}"
                 
-                # MIDI channel (offset +2)
-                midi_channel = self.data[timbre_offset + 2] if timbre_offset + 2 < len(self.data) else 0
+                # Status (offset +2, bits 7-5) - from C# KronosOasysTimbre.cs
+                # 0=Off, 1=Int, 2=Both, 3=Ext, 4=Ex2
+                status_byte = self.data[timbre_offset + 2] if timbre_offset + 2 < len(self.data) else 0
+                status_value = (status_byte >> 5) & 0x07
+                status_names = ["Off", "Int", "Both", "Ext", "Ex2"]
+                status = status_names[status_value] if status_value < len(status_names) else "Off"
                 
-                # Volume (offset +6)
-                volume = self.data[timbre_offset + 6] if timbre_offset + 6 < len(self.data) else 127
+                # MIDI channel (offset +2, bits 4-0)
+                midi_channel = status_byte & 0x1F  # Extract bits 4-0
                 
-                # Pan (offset +7)
-                pan = self.data[timbre_offset + 7] if timbre_offset + 7 < len(self.data) else 64
+                # Volume (offset +5, bits 7-0)
+                volume = self.data[timbre_offset + 5] if timbre_offset + 5 < len(self.data) else 127
                 
-                # Detune (offset +8, 2 bytes, signed) - Based on C# KronosTimbre.cs
+                # Pan - not a timbre parameter (stored in program)
+                pan = 64
+                
+                # Transpose (offset +7, bits 7-0, signed)
+                transpose = 0
+                if timbre_offset + 7 < len(self.data):
+                    transpose_byte = self.data[timbre_offset + 7]
+                    # Convert unsigned byte to signed (-128 to +127)
+                    transpose = transpose_byte if transpose_byte < 128 else transpose_byte - 256
+                
+                # Detune (offset +8, 2 bytes, signed, little-endian)
                 detune = 0
                 if timbre_offset + 10 <= len(self.data):
-                    detune_raw = struct.unpack('<h', self.data[timbre_offset + 8:timbre_offset + 10])[0]
-                    detune = detune_raw  # Already signed
+                    detune = struct.unpack('<h', self.data[timbre_offset + 8:timbre_offset + 10])[0]
                 
-                # Transpose (offset +10, 1 byte, signed, -24 to +24)
-                transpose = 0
-                if timbre_offset + 11 <= len(self.data):
-                    transpose_byte = self.data[timbre_offset + 10]
-                    # Convert to signed (-24 to +24)
-                    transpose = transpose_byte - 64 if transpose_byte >= 40 else transpose_byte
+                # Mute (offset +34, bit 7) - from C# KronosOasysTimbre.cs
+                mute = False
+                if timbre_offset + 34 < len(self.data):
+                    mute = bool(self.data[timbre_offset + 34] & 0x80)
                 
-                # Key zone (bottom/top keys) - need to find correct offsets
-                # For now, use reasonable defaults
-                bottom_key = 0
-                top_key = 127
+                # Priority (offset +35, bit 4) - from C# KronosOasysTimbre.cs
+                priority = False
+                if timbre_offset + 35 < len(self.data):
+                    priority = bool(self.data[timbre_offset + 35] & 0x10)
                 
-                # Velocity zone
-                bottom_velocity = 1
-                top_velocity = 127
+                # Osc Mode (offset +35, bits 1-0) - from C# KronosOasysTimbre.cs
+                # 0=Prg, 1=Poly, 2=Mono, 3=Legato
+                osc_mode = "Prg"
+                if timbre_offset + 35 < len(self.data):
+                    osc_mode_value = self.data[timbre_offset + 35] & 0x03
+                    osc_mode_names = ["Prg", "Poly", "Mono", "Legato"]
+                    osc_mode = osc_mode_names[osc_mode_value] if osc_mode_value < len(osc_mode_names) else "Prg"
+                
+                # Osc Select (offset +35, bits 3-2) - from C# KronosOasysTimbre.cs
+                # 0=Both, 1=Osc1, 2=Osc2
+                osc_select = "Both"
+                if timbre_offset + 35 < len(self.data):
+                    osc_select_value = (self.data[timbre_offset + 35] >> 2) & 0x03
+                    osc_select_names = ["Both", "Osc1", "Osc2"]
+                    osc_select = osc_select_names[osc_select_value] if osc_select_value < len(osc_select_names) else "Both"
+                
+                # Portamento (offset +36, bits 7-0, signed) - from C# KronosOasysTimbre.cs
+                portamento = 0
+                if timbre_offset + 36 < len(self.data):
+                    portamento_byte = self.data[timbre_offset + 36]
+                    portamento = portamento_byte if portamento_byte < 128 else portamento_byte - 256
+                
+                # Key zones (offset +37/+38) - from C# KronosOasysTimbre.cs
+                top_key = self.data[timbre_offset + 37] if timbre_offset + 37 < len(self.data) else 127
+                bottom_key = self.data[timbre_offset + 38] if timbre_offset + 38 < len(self.data) else 0
+                
+                # Velocity zones (offset +40/+41) - from C# KronosOasysTimbre.cs
+                top_velocity = self.data[timbre_offset + 40] if timbre_offset + 40 < len(self.data) else 127
+                bottom_velocity = self.data[timbre_offset + 41] if timbre_offset + 41 < len(self.data) else 1
                 
                 timbre = Timbre(
                     program_bank=prog_bank,
@@ -996,9 +1024,13 @@ class PcgBinaryParser:
                     status=status,
                     volume=volume,
                     pan=pan,
-                    mute=False,
+                    mute=mute,
+                    priority=priority,
                     detune=detune,
                     transpose=transpose,
+                    portamento=portamento,
+                    osc_mode=osc_mode,
+                    osc_select=osc_select,
                     bottom_key=bottom_key,
                     top_key=top_key,
                     bottom_velocity=bottom_velocity,

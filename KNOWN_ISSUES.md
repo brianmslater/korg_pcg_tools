@@ -1,40 +1,37 @@
 # Known Issues and Limitations
 
-## 🚨 Critical Issues
+## ✅ Fixed Issues
 
-### Program/Combi Editing Corrupts Files (v1.2.1)
-**Status:** ❌ DISABLED - Critical bug  
-**Severity:** Critical  
-**Affects:** All platforms  
-**Hardware Impact:** Files become unloadable on Kronos
-
-**Problem:**
-Editing program or combi names/parameters corrupts the PCG file. The Kronos hardware rejects edited files with "File Unavailable" error.
+### Program/Combi Editing Corrupts Files (FIXED in v1.2.1)
+**Status:** ✅ FIXED - Nov 27, 2025  
+**Was:** Critical bug blocking all editing  
+**Fixed:** Implemented checksum calculation
 
 **Root Cause:**
-Programs and combis have internal checksums or validation data that we don't know how to update. When we change any parameter (even just the name), the checksum becomes invalid and the Kronos rejects the file.
+PCG files use checksums stored at byte 11 of each chunk header. The Kronos validates these checksums and rejects files with incorrect values.
 
-**Evidence:**
-- Unmodified roundtrip: ✅ Works (file identical, loads on hardware)
-- Name-only edit: ❌ Fails (only 24 bytes changed, but file rejected)
-- Full edit: ❌ Fails (file rejected)
+**Solution:**
+- Created `pcg_tools/checksum.py` with proper checksum calculation
+- Checksums automatically fixed before writing
+- Handles nested chunk structure (SLS1 → STL1 → SBK1)
+- Updates both SLS1 and STL1 for setlist changes
 
-**Current Status:**
-- Program/combi editing DISABLED in GUI (shows warning dialog)
-- Setlist editing still works perfectly (no checksums)
-- Parameter parsing works correctly (read-only)
-
-**Workaround:**
-Use the C# PCG Tools for program/combi editing until we figure out the checksum algorithm.
-
-**Investigation Needed:**
-1. Reverse engineer the checksum algorithm from C# code
-2. Find where checksums are stored in the binary format
-3. Implement checksum calculation and update
+**Hardware Tested and Verified:**
+- ✅ Setlist name editing works
+- ✅ Program name editing works
+- ✅ Combi name editing works
+- ✅ All changes appear correctly on Kronos hardware
+- ✅ Files load without errors
 
 ---
 
-## ✅ Fixed Issues
+## 🚨 Critical Issues
+
+None currently! All editing features are working.
+
+---
+
+## ✅ Previously Fixed Issues
 
 ### Program/Combi Editing Crash on macOS (FIXED in v1.2.1)
 **Status:** ✅ FIXED  
