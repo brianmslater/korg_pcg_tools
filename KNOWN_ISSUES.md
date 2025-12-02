@@ -72,11 +72,18 @@ Replaced Tkinter dialog with native Qt dialog (`qt_edit_dialog.py`). However, ed
 
 ### ❌ What Doesn't Work Yet
 
+**Slot Notes/Comments:**
+- ❌ Slot notes are not displayed in the GUI
+- **Why**: Notes are stored in a complex structure within the SLS1 chunk that hasn't been fully parsed yet
+- **Details**: Notes appear after the slot name with metadata bytes in between
+- **Status**: Parsing implementation needed - the data exists in the file but requires additional parser work
+- **Workaround**: View/edit notes on Kronos hardware or use C# PCG Tools
+
 **Slot Property Editing:**
-- ❌ Slot colors, text size, transpose, volume, notes
-- **Why**: These properties are NOT stored in the SLS1/SLD1 format
-- **Details**: The internal 16-setlist format only stores setlist names and slot names (combi names)
-- **Workaround**: These are display settings on the Kronos itself, not in the PCG file
+- ✅ Slot colors now display correctly (v1.2.1+)
+- ✅ Slot text size parsed correctly (v1.2.1+)
+- ❌ Editing of transpose, volume not yet implemented
+- **Note**: Color and text size are read-only in current version
 
 **Program/Combi Editing:**
 - ❌ No GUI for editing program/combi names
