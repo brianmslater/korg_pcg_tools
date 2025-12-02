@@ -416,15 +416,24 @@ class PcgBinaryParser:
         For combis, the mapping is simpler (0-6 for I-A through I-G, 0x20000+ for user).
         """
         if is_combi:
-            # Combi banks: I-A through I-G (0-6), U-A through U-G (0x20000-0x20006)
-            if bank_id_raw < 7:
-                return f"I-{chr(65 + bank_id_raw)}"
-            elif bank_id_raw >= 0x20000:
-                user_idx = bank_id_raw - 0x20000
-                if user_idx < 7:
-                    return f"U-{chr(65 + user_idx)}"
+            # Combi bank ID format: (bank_type << 16) | sub_index
+            # bank_type: 0 = Internal, 2 = User
+            # sub_index: 0-6 for A-G
+            bank_type = (bank_id_raw >> 16) & 0xFFFF
+            sub_index = bank_id_raw & 0xFFFF
+            
+            if bank_type == 0:
+                # Internal banks: I-A through I-G
+                if sub_index < 7:
+                    return f"I-{chr(65 + sub_index)}"
                 else:
-                    return f"U-{user_idx}"
+                    return f"I-?{sub_index}"
+            elif bank_type == 2:
+                # User banks: U-A through U-G
+                if sub_index < 7:
+                    return f"U-{chr(65 + sub_index)}"
+                else:
+                    return f"U-?{sub_index}"
             else:
                 return f"?-{bank_id_raw:08X}"
         else:
@@ -930,7 +939,8 @@ class PcgBinaryParser:
             pcg.combi_banks.append(bank)
             debug_print(f"  Added bank {bank_id} with {len(combis)} combis")
         
-        return start_offset + 8 + chunk_size + 12
+        # Return next offset: chunk header (8) + chunk data + padding (4)
+        return start_offset + 8 + chunk_size + 4
     
     def _extract_combi_params(self, combi_data: bytes) -> Tuple[Optional[Category], bool, float]:
         """Extract combi parameters: Category, Favorite flag, and Tempo.
@@ -1366,11 +1376,33 @@ class PcgBinaryParser:
                 # Read slot name (24 bytes)
                 slot_name = self.get_string(slot_offset, 24)
                 
-                # Color at +24 from slot name start
-                color = self.data[slot_offset + 24] if slot_offset + 24 < len(self.data) else 0
+                # Color is stored in bits 5-2 of byte +24 (4 bits = 0-15 color index)
+                # Then we need to map the index to the actual color value
+                color = 0
+                if slot_offset + 24 < len(self.data):
+                    from .bit_utils import get_bits
+                    color_index = get_bits(self.data, slot_offset + 24, 5, 2)
+                    # Map color index (0-15) to color value
+                    # Based on Kronos color mapping: index * 4 + 136, with 0 = Default
+                    if color_index == 0:
+                        color = 0  # Default
+                    else:
+                        color = (color_index - 1) * 4 + 136
                 
-                # Text size at +29 from slot name start  
-                text_size = self.data[slot_offset + 29] if slot_offset + 29 < len(self.data) else 0
+                # Text size is split across two bytes:
+                # MSB (1 bit) -> byte +29, bit 4
+                # LSB (2 bits) -> byte +24, bits 7-6
+                text_size = 2  # Default to Medium
+                if slot_offset + 29 < len(self.data):
+                    from .bit_utils import get_bits
+                    msb = get_bits(self.data, slot_offset + 29, 4, 4)
+                    lsb = get_bits(self.data, slot_offset + 24, 7, 6)
+                    text_size_value = (msb << 2) | lsb
+                    # Validate it's in range 0-4 (XS, S, M, L, XL)
+                    if 0 <= text_size_value <= 4:
+                        text_size = text_size_value
+                    else:
+                        text_size = 2  # Default to Medium if invalid
                 
                 # Patch reference at +24 (type), +25 (bank) and +26 (index) from name start
                 patch_bank = ""

@@ -469,17 +469,21 @@ class PcgMainWindow(QMainWindow):
         if not self.pcg:
             return
         
+        from .models import format_bank_id_for_display
+        
         # Get selected bank (0 = "All Banks")
         selected_bank_index = self.program_bank_list.currentRow() if hasattr(self, 'program_bank_list') else 0
-        selected_bank_name = None
+        selected_bank_display_name = None
         if selected_bank_index > 0 and hasattr(self, 'program_bank_list'):
-            selected_bank_name = self.program_bank_list.currentItem().text()
+            selected_bank_display_name = self.program_bank_list.currentItem().text()
         
         program_count = 0
         for bank in self.pcg.program_banks:
             # Skip if filtering by bank and this isn't the selected bank
-            if selected_bank_name and bank.bank_id != selected_bank_name:
-                continue
+            if selected_bank_display_name:
+                bank_display_name = format_bank_id_for_display(bank.bank_id)
+                if bank_display_name != selected_bank_display_name:
+                    continue
                 
             for prog in bank.patches:
                 row = self.programs_table.rowCount()
@@ -494,7 +498,7 @@ class PcgMainWindow(QMainWindow):
                 program_count += 1
         
         # Update status bar with count
-        bank_info = f" from bank {selected_bank_name}" if selected_bank_name else f" from {len(self.pcg.program_banks)} banks"
+        bank_info = f" from bank {selected_bank_display_name}" if selected_bank_display_name else f" from {len(self.pcg.program_banks)} banks"
         if program_count == 0:
             self.statusbar.showMessage(f"No programs found{bank_info}")
         else:
@@ -507,17 +511,21 @@ class PcgMainWindow(QMainWindow):
         if not self.pcg:
             return
         
+        from .models import format_bank_id_for_display
+        
         # Get selected bank (0 = "All Banks")
         selected_bank_index = self.combi_bank_list.currentRow() if hasattr(self, 'combi_bank_list') else 0
-        selected_bank_name = None
+        selected_bank_display_name = None
         if selected_bank_index > 0 and hasattr(self, 'combi_bank_list'):
-            selected_bank_name = self.combi_bank_list.currentItem().text()
+            selected_bank_display_name = self.combi_bank_list.currentItem().text()
         
         combi_count = 0
         for bank in self.pcg.combi_banks:
             # Skip if filtering by bank and this isn't the selected bank
-            if selected_bank_name and bank.bank_id != selected_bank_name:
-                continue
+            if selected_bank_display_name:
+                bank_display_name = format_bank_id_for_display(bank.bank_id)
+                if bank_display_name != selected_bank_display_name:
+                    continue
                 
             for combi in bank.patches:
                 row = self.combis_table.rowCount()
@@ -531,7 +539,7 @@ class PcgMainWindow(QMainWindow):
                 combi_count += 1
         
         # Update status bar with count
-        bank_info = f" from bank {selected_bank_name}" if selected_bank_name else f" from {len(self.pcg.combi_banks)} banks"
+        bank_info = f" from bank {selected_bank_display_name}" if selected_bank_display_name else f" from {len(self.pcg.combi_banks)} banks"
         if combi_count > 0:
             self.statusbar.showMessage(f"Loaded {combi_count} combis{bank_info}")
     
@@ -703,22 +711,47 @@ class PcgMainWindow(QMainWindow):
         if not self.pcg:
             return
         
+        from .models import format_bank_id_for_display
+        
         # Populate program banks
         self.program_bank_list.clear()
         self.program_bank_list.addItem("All Banks")
         for bank in self.pcg.program_banks:
-            self.program_bank_list.addItem(bank.bank_id)
+            display_name = format_bank_id_for_display(bank.bank_id)
+            self.program_bank_list.addItem(display_name)
         self.program_bank_list.setCurrentRow(0)
         
         # Populate combi banks
         self.combi_bank_list.clear()
         self.combi_bank_list.addItem("All Banks")
         for bank in self.pcg.combi_banks:
-            self.combi_bank_list.addItem(bank.bank_id)
+            display_name = format_bank_id_for_display(bank.bank_id)
+            self.combi_bank_list.addItem(display_name)
         self.combi_bank_list.setCurrentRow(0)
     
     def on_program_bank_changed(self, index):
         """Handle program bank selection change."""
+        # Check if this is a placeholder bank
+        if index > 0 and self.pcg and self.pcg.program_banks:
+            # Get the actual bank (index-1 because of "All Banks" at position 0)
+            bank_index = index - 1
+            if bank_index < len(self.pcg.program_banks):
+                bank = self.pcg.program_banks[bank_index]
+                if bank.is_placeholder:
+                    QMessageBox.information(
+                        self,
+                        "Bank Not Implemented",
+                        f"Bank {bank.bank_id} is not yet implemented.\n\n"
+                        f"This bank exists on the Kronos hardware but is not currently "
+                        f"parsed from PCG files. It contains read-only ROM programs:\n\n"
+                        f"• g(1)-g(9): GM2 Main programs (additional GM sound variations)\n"
+                        f"• g(d): GM2 Drum kits\n\n"
+                        f"These banks may be supported in a future release."
+                    )
+                    # Reset to "All Banks"
+                    self.program_bank_list.setCurrentRow(0)
+                    return
+        
         self.load_programs()
     
     def on_combi_bank_changed(self, index):
