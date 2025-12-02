@@ -575,6 +575,13 @@ class PcgMainWindow(QMainWindow):
             timbre_row = self.timbres_table.rowCount()
             self.timbres_table.insertRow(timbre_row)
             
+            # Debug: Print first timbre details
+            if i == 1:
+                print(f"DEBUG: First timbre of {combi.name}:")
+                print(f"  program_bank: {timbre.program_bank}")
+                print(f"  program_index: {timbre.program_index}")
+                print(f"  program_id: {timbre.program_id}")
+            
             # Look up program name from dictionary
             program_name = program_lookup.get(timbre.program_id, "")
             
@@ -895,8 +902,21 @@ class PcgMainWindow(QMainWindow):
         if not self.pcg:
             return None
         
+        # Get selected bank filter (if any)
+        selected_bank_index = self.program_bank_list.currentRow() if hasattr(self, 'program_bank_list') else 0
+        selected_bank_display_name = None
+        if selected_bank_index > 0 and hasattr(self, 'program_bank_list'):
+            selected_bank_display_name = self.program_bank_list.currentItem().text()
+        
         current_row = 0
         for bank in self.pcg.program_banks:
+            # Skip if filtering by bank and this isn't the selected bank
+            if selected_bank_display_name:
+                from .models import format_bank_id_for_display
+                bank_display_name = format_bank_id_for_display(bank.bank_id)
+                if bank_display_name != selected_bank_display_name:
+                    continue
+            
             for prog in bank.patches:
                 if current_row == row:
                     return prog
@@ -908,8 +928,21 @@ class PcgMainWindow(QMainWindow):
         if not self.pcg:
             return None
         
+        # Get selected bank filter (if any)
+        selected_bank_index = self.combi_bank_list.currentRow() if hasattr(self, 'combi_bank_list') else 0
+        selected_bank_display_name = None
+        if selected_bank_index > 0 and hasattr(self, 'combi_bank_list'):
+            selected_bank_display_name = self.combi_bank_list.currentItem().text()
+        
         current_row = 0
         for bank in self.pcg.combi_banks:
+            # Skip if filtering by bank and this isn't the selected bank
+            if selected_bank_display_name:
+                from .models import format_bank_id_for_display
+                bank_display_name = format_bank_id_for_display(bank.bank_id)
+                if bank_display_name != selected_bank_display_name:
+                    continue
+            
             for combi in bank.patches:
                 if current_row == row:
                     return combi
