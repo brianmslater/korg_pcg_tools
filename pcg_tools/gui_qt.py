@@ -348,6 +348,7 @@ class PcgMainWindow(QMainWindow):
         self.timbres_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)  # Stretch Program Name column
         self.timbres_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.timbres_table.doubleClicked.connect(self.edit_timbre)
+        self.timbres_table.cellClicked.connect(self.on_timbre_cell_clicked)
         
         layout.addWidget(self.timbres_table, stretch=1)
         
@@ -629,6 +630,153 @@ class PcgMainWindow(QMainWindow):
             self.mark_dirty()
             self.load_combi_timbres()  # Refresh timbre display
     
+    def on_timbre_cell_clicked(self, row, column):
+        """Handle click on timbre table cell - show program selector dialog."""
+        # Only handle clicks on the "Program" column (column 1)
+        if column != 1:
+            return
+        
+        if not self.pcg:
+            return
+        
+        # Get the selected combi
+        combi_rows = self.combis_table.selectedItems()
+        if not combi_rows:
+            return
+        
+        combi_row = combi_rows[0].row()
+        combi = self._get_combi_at_row(combi_row)
+        
+        if not combi or row >= len(combi.timbres):
+            return
+        
+        timbre = combi.timbres[row]
+        
+        # Show program selector dialog
+        selected_program = self._show_program_selector_dialog(timbre.program_id)
+        
+        if selected_program:
+            # Parse the program ID (e.g., "INT-A042" -> bank="I-A", index=42)
+            if selected_program.startswith("INT-"):
+                timbre.program_bank = "I-" + selected_program[4:-3]
+            elif selected_program.startswith("USER-"):
+                timbre.program_bank = "U-" + selected_program[5:-3]
+            else:
+                # GM, g(1)-g(9), g(d), U-AA, etc.
+                timbre.program_bank = selected_program[:-3]
+            
+            timbre.program_index = int(selected_program[-3:])
+            
+            self.mark_dirty()
+            self.load_combi_timbres()  # Refresh display
+    
+    def _show_program_selector_dialog(self, current_program_id):
+        """Show a searchable, bank-organized program selector dialog."""
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QListWidget, QListWidgetItem, QPushButton
+        
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Select Program")
+        dialog.setMinimumSize(800, 600)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # Search box at top
+        search_layout = QHBoxLayout()
+        search_box = QLineEdit()
+        search_box.setPlaceholderText("Search programs by name...")
+        search_layout.addWidget(QLabel("Search:"))
+        search_layout.addWidget(search_box)
+        layout.addLayout(search_layout)
+        
+        # Horizontal layout for banks and programs
+        content_layout = QHBoxLayout()
+        
+        # Left: Bank list
+        bank_list = QListWidget()
+        bank_list.setMaximumWidth(200)
+        content_layout.addWidget(bank_list)
+        
+        # Right: Program list
+        program_list = QListWidget()
+        content_layout.addWidget(program_list)
+        
+        layout.addLayout(content_layout)
+        
+        # Buttons
+        button_layout = QHBoxLayout()
+        ok_button = QPushButton("OK")
+        cancel_button = QPushButton("Cancel")
+        button_layout.addStretch()
+        button_layout.addWidget(ok_button)
+        button_layout.addWidget(cancel_button)
+        layout.addLayout(button_layout)
+        
+        # Populate banks
+        bank_list.addItem("All Banks")
+        for bank in self.pcg.program_banks:
+            bank_list.addItem(f"{bank.bank_id} ({len(bank.patches)} programs)")
+        
+        selected_program = [None]  # Use list to allow modification in nested function
+        
+        def load_programs(bank_index=None, search_text=""):
+            """Load programs for selected bank with optional search filter."""
+            program_list.clear()
+            
+            search_lower = search_text.lower()
+            
+            if bank_index == 0 or bank_index is None:
+                # All banks
+                for bank in self.pcg.program_banks:
+                    for prog in bank.patches:
+                        if not search_text or search_lower in prog.name.lower():
+                            item = QListWidgetItem(f"{prog.id}: {prog.name}")
+                            item.setData(Qt.UserRole, prog.id)
+                            program_list.addItem(item)
+                            if prog.id == current_program_id:
+                                program_list.setCurrentItem(item)
+            else:
+                # Specific bank
+                bank = self.pcg.program_banks[bank_index - 1]
+                for prog in bank.patches:
+                    if not search_text or search_lower in prog.name.lower():
+                        item = QListWidgetItem(f"{prog.id}: {prog.name}")
+                        item.setData(Qt.UserRole, prog.id)
+                        program_list.addItem(item)
+                        if prog.id == current_program_id:
+                            program_list.setCurrentItem(item)
+        
+        def on_bank_selected(row):
+            load_programs(row, search_box.text())
+        
+        def on_search_changed(text):
+            current_bank = bank_list.currentRow()
+            load_programs(current_bank if current_bank >= 0 else 0, text)
+        
+        def on_program_double_clicked(item):
+            selected_program[0] = item.data(Qt.UserRole)
+            dialog.accept()
+        
+        def on_ok_clicked():
+            current_item = program_list.currentItem()
+            if current_item:
+                selected_program[0] = current_item.data(Qt.UserRole)
+                dialog.accept()
+        
+        bank_list.currentRowChanged.connect(on_bank_selected)
+        search_box.textChanged.connect(on_search_changed)
+        program_list.itemDoubleClicked.connect(on_program_double_clicked)
+        ok_button.clicked.connect(on_ok_clicked)
+        cancel_button.clicked.connect(dialog.reject)
+        
+        # Initial load
+        bank_list.setCurrentRow(0)
+        load_programs(0)
+        
+        # Show dialog
+        if dialog.exec() == QDialog.Accepted:
+            return selected_program[0]
+        return None
+    
     def load_setlists(self):
         """Load setlists into combo box."""
         self.setlist_combo.clear()
@@ -725,6 +873,9 @@ class PcgMainWindow(QMainWindow):
         self.program_bank_list.addItem("All Banks")
         for bank in self.pcg.program_banks:
             display_name = format_bank_id_for_display(bank.bank_id)
+            # Add ROM indicator for read-only banks
+            if bank.is_read_only:
+                display_name += " [ROM]"
             self.program_bank_list.addItem(display_name)
         self.program_bank_list.setCurrentRow(0)
         
@@ -733,37 +884,73 @@ class PcgMainWindow(QMainWindow):
         self.combi_bank_list.addItem("All Banks")
         for bank in self.pcg.combi_banks:
             display_name = format_bank_id_for_display(bank.bank_id)
+            # Add ROM indicator for read-only banks (if any)
+            if bank.is_read_only:
+                display_name += " [ROM]"
             self.combi_bank_list.addItem(display_name)
         self.combi_bank_list.setCurrentRow(0)
     
     def on_program_bank_changed(self, index):
         """Handle program bank selection change."""
-        # Check if this is a placeholder bank
+        # Store current bank for read-only checks
+        self.current_program_bank = None
+        
         if index > 0 and self.pcg and self.pcg.program_banks:
             # Get the actual bank (index-1 because of "All Banks" at position 0)
             bank_index = index - 1
             if bank_index < len(self.pcg.program_banks):
-                bank = self.pcg.program_banks[bank_index]
-                if bank.is_placeholder:
+                self.current_program_bank = self.pcg.program_banks[bank_index]
+                
+                # Check if this is a placeholder bank (should not happen anymore)
+                if self.current_program_bank.is_placeholder:
                     QMessageBox.information(
                         self,
                         "Bank Not Implemented",
-                        f"Bank {bank.bank_id} is not yet implemented.\n\n"
+                        f"Bank {self.current_program_bank.bank_id} is not yet implemented.\n\n"
                         f"This bank exists on the Kronos hardware but is not currently "
-                        f"parsed from PCG files. It contains read-only ROM programs:\n\n"
-                        f"• g(1)-g(9): GM2 Main programs (additional GM sound variations)\n"
-                        f"• g(d): GM2 Drum kits\n\n"
-                        f"These banks may be supported in a future release."
+                        f"parsed from PCG files."
                     )
                     # Reset to "All Banks"
                     self.program_bank_list.setCurrentRow(0)
+                    self.current_program_bank = None
                     return
         
         self.load_programs()
+        self._update_program_buttons_state()
     
     def on_combi_bank_changed(self, index):
         """Handle combi bank selection change."""
         self.load_combis()
+    
+    def _update_program_buttons_state(self):
+        """Update program edit/paste button states based on current bank."""
+        is_readonly = False
+        
+        if hasattr(self, 'current_program_bank') and self.current_program_bank:
+            is_readonly = self.current_program_bank.is_read_only
+        
+        # Edit and Paste should be disabled for read-only banks
+        if hasattr(self, 'edit_button'):
+            self.edit_button.setEnabled(not is_readonly)
+            if is_readonly:
+                self.edit_button.setToolTip("Cannot edit programs in ROM banks")
+            else:
+                self.edit_button.setToolTip("Edit selected program")
+        
+        if hasattr(self, 'paste_button'):
+            self.paste_button.setEnabled(not is_readonly)
+            if is_readonly:
+                self.paste_button.setToolTip("Cannot paste into ROM banks")
+            else:
+                self.paste_button.setToolTip("Paste program from clipboard")
+        
+        # Copy should always be enabled (can copy from ROM banks)
+        if hasattr(self, 'copy_button'):
+            self.copy_button.setEnabled(True)
+            if is_readonly:
+                self.copy_button.setToolTip("Copy program from ROM bank")
+            else:
+                self.copy_button.setToolTip("Copy selected program")
     
     def _get_display_color(self, color_value):
         """Get QColor for display based on slot color value."""
@@ -851,11 +1038,33 @@ class PcgMainWindow(QMainWindow):
         current_tab = self.tabs.currentIndex()
         
         if current_tab == 0:  # Programs
+            # Check if current bank is read-only
+            if hasattr(self, 'current_program_bank') and self.current_program_bank:
+                if self.current_program_bank.is_read_only:
+                    QMessageBox.warning(
+                        self,
+                        "ROM Bank",
+                        f"Cannot edit programs in ROM bank '{self.current_program_bank.bank_id}'.\n\n"
+                        f"This is a read-only bank stored in the Kronos firmware.\n"
+                        f"You can copy programs from this bank to a user bank and edit them there."
+                    )
+                    return
+            
             row = self.programs_table.currentRow()
             if row >= 0:
                 # Get the program from the PCG file
                 program = self._get_program_at_row(row)
                 if program:
+                    # Additional check: verify program is not in a ROM bank
+                    for bank in self.pcg.program_banks:
+                        if bank.bank_id == program.bank and bank.is_read_only:
+                            QMessageBox.warning(
+                                self,
+                                "ROM Bank",
+                                f"Cannot edit program in ROM bank '{bank.bank_id}'.\n\n"
+                                f"You can copy this program to a user bank and edit it there."
+                            )
+                            return
                     self.edit_program(program)
         
         elif current_tab == 1:  # Combis
@@ -951,39 +1160,35 @@ class PcgMainWindow(QMainWindow):
     
     def edit_program(self, program):
         """Edit a program using the Qt edit dialog."""
-        # CRITICAL: Program editing is DISABLED due to file corruption
-        # Editing programs breaks hardware validation (checksum issue)
-        QMessageBox.warning(
-            self,
-            "Program Editing Disabled",
-            f"Program editing is currently disabled due to a critical bug.\n\n"
-            f"Program: {program.id} - {program.name}\n"
-            f"Category: {program.category.main_category if program.category else 'N/A'}\n"
-            f"Favorite: {program.favorite}\n"
-            f"Engine: {program.engine}\n\n"
-            f"Issue: Editing programs corrupts the file (Kronos shows 'File Unavailable').\n"
-            f"Cause: Programs have internal checksums that we don't know how to update.\n\n"
-            f"Workaround: Use the C# PCG Tools for program editing.\n"
-            f"Status: Being investigated for future release."
-        )
+        from .qt_edit_dialog import QtEditPatchDialog
+        
+        dialog = QtEditPatchDialog(self, program, "program")
+        if dialog.exec() and dialog.result:
+            # Update the program with edited values
+            program.name = dialog.result.get('name', program.name)
+            if 'favorite' in dialog.result:
+                program.favorite = dialog.result['favorite']
+            if 'category' in dialog.result and program.category:
+                program.category.main_category = dialog.result['category']
+            
+            self.mark_dirty()
+            self.load_programs()  # Refresh display
     
     def edit_combi(self, combi):
         """Edit a combi using the Qt edit dialog."""
-        # CRITICAL: Combi editing is DISABLED due to file corruption
-        # Editing combis breaks hardware validation (checksum issue)
-        QMessageBox.warning(
-            self,
-            "Combi Editing Disabled",
-            f"Combi editing is currently disabled due to a critical bug.\n\n"
-            f"Combi: {combi.id} - {combi.name}\n"
-            f"Category: {combi.category.main_category if combi.category else 'N/A'}\n"
-            f"Favorite: {combi.favorite}\n"
-            f"Tempo: {combi.tempo} BPM\n\n"
-            f"Issue: Editing combis corrupts the file (Kronos shows 'File Unavailable').\n"
-            f"Cause: Combis have internal checksums that we don't know how to update.\n\n"
-            f"Workaround: Use the C# PCG Tools for combi editing.\n"
-            f"Status: Being investigated for future release."
-        )
+        from .qt_edit_dialog import QtEditPatchDialog
+        
+        dialog = QtEditPatchDialog(self, combi, "combi")
+        if dialog.exec() and dialog.result:
+            # Update the combi with edited values
+            combi.name = dialog.result.get('name', combi.name)
+            if 'favorite' in dialog.result:
+                combi.favorite = dialog.result['favorite']
+            if 'category' in dialog.result and combi.category:
+                combi.category.main_category = dialog.result['category']
+            
+            self.mark_dirty()
+            self.load_combis()  # Refresh display
     
     def edit_slot_name(self, slot):
         """Edit slot name, color, text size, and patch assignment."""
@@ -1085,7 +1290,10 @@ class PcgMainWindow(QMainWindow):
             
             # Set current patch if it exists
             if slot.patch_bank and slot.patch_type == patch_type:
-                current_id = f"{slot.patch_bank}{slot.patch_index:03d}"
+                # Convert internal bank format to display format for matching
+                from .models import format_bank_id_for_display
+                display_bank = format_bank_id_for_display(slot.patch_bank)
+                current_id = f"{display_bank}{slot.patch_index:03d}"
                 for i in range(patch_combo.count()):
                     if patch_combo.itemData(i) == current_id:
                         patch_combo.setCurrentIndex(i)
@@ -1130,9 +1338,22 @@ class PcgMainWindow(QMainWindow):
                 slot.patch_type = patch_type
                 patch_id = patch_combo.currentData()
                 if patch_id:
-                    # Parse patch ID (e.g., "I-A042" -> bank="I-A", index=42)
-                    slot.patch_bank = patch_id[:-3]
-                    slot.patch_index = int(patch_id[-3:])
+                    # Parse patch ID (e.g., "INT-A042" or "USER-B001")
+                    # Extract bank and index
+                    display_bank = patch_id[:-3]
+                    index = int(patch_id[-3:])
+                    
+                    # Convert display format back to internal format
+                    if display_bank.startswith("INT-"):
+                        internal_bank = "I-" + display_bank[4:]
+                    elif display_bank.startswith("USER-"):
+                        internal_bank = "U-" + display_bank[5:]
+                    else:
+                        # GM, g(1)-g(9), g(d) remain unchanged
+                        internal_bank = display_bank
+                    
+                    slot.patch_bank = internal_bank
+                    slot.patch_index = index
             else:
                 slot.patch_type = ""
                 slot.patch_bank = ""
@@ -1374,6 +1595,18 @@ class PcgMainWindow(QMainWindow):
         current_tab = self.tabs.currentIndex()
         
         if current_tab == 0:  # Programs tab
+            # Check if current bank is read-only
+            if hasattr(self, 'current_program_bank') and self.current_program_bank:
+                if self.current_program_bank.is_read_only:
+                    QMessageBox.warning(
+                        self,
+                        "ROM Bank",
+                        f"Cannot paste into ROM bank '{self.current_program_bank.bank_id}'.\n\n"
+                        f"This is a read-only bank stored in the Kronos firmware.\n"
+                        f"Please select a user bank (USER-A through USER-GG) to paste."
+                    )
+                    return
+            
             if not clipboard.has_program():
                 QMessageBox.warning(self, "Nothing to Paste", "Clipboard is empty. Copy a program first.")
                 return
@@ -1388,6 +1621,17 @@ class PcgMainWindow(QMainWindow):
             
             if not target_program:
                 return
+            
+            # Additional check: verify target program is not in a ROM bank
+            for bank in self.pcg.program_banks:
+                if bank.bank_id == target_program.bank and bank.is_read_only:
+                    QMessageBox.warning(
+                        self,
+                        "ROM Bank",
+                        f"Cannot paste into ROM bank '{bank.bank_id}'.\n\n"
+                        f"Please select a program in a user bank."
+                    )
+                    return
             
             # Confirm paste
             reply = QMessageBox.question(

@@ -45,6 +45,7 @@ class PcgReader:
         parser.parse_cmb1_chunk(pcg)
         parser.parse_sls1_chunk(pcg)
         parser.parse_stl1_chunk(pcg)  # Parse color and text size metadata
+        parser.parse_slot_notes(pcg)  # Parse slot notes/comments
         
         # Add placeholder banks for unimplemented GM banks
         self._add_placeholder_banks(pcg)
@@ -52,27 +53,76 @@ class PcgReader:
         return pcg
     
     def _add_placeholder_banks(self, pcg: PcgFile):
-        """Add placeholder banks for g(1)-g(9) and g(d) that are not yet implemented.
+        """Add GM2 banks g(1)-g(9) and g(d) with program definitions.
         
         These banks exist on the Kronos hardware but are not parsed from the PCG file.
-        They are shown in the GUI with a "not implemented" message.
+        They are ROM banks with read-only programs. We populate them with known
+        program names for display purposes only (not editable).
         """
+        from .gm2_data import get_gm2_program_name, get_gm2_category
+        
         # g(1) through g(9): GM2 Main programs
         for i in range(1, 10):
+            bank_id = f"g({i})"
+            programs = []
+            
+            # Create 128 programs for this bank
+            for index in range(128):
+                # Get category for this program
+                category = None
+                cat_tuple = get_gm2_category(bank_id, index)
+                if cat_tuple:
+                    category = Category(
+                        main_category=cat_tuple[0],
+                        sub_category=cat_tuple[1]
+                    )
+                
+                prog = Program(
+                    bank=bank_id,
+                    index=index,
+                    name=get_gm2_program_name(bank_id, index),
+                    engine="GM2",
+                    osc_mode="Single",
+                    category=category
+                )
+                programs.append(prog)
+            
             bank = Bank(
-                bank_id=f"g({i})",
+                bank_id=bank_id,
                 bank_type="Program",
-                patches=[],
-                is_placeholder=True
+                patches=programs,
+                is_placeholder=False,  # Has actual data
+                is_read_only=True  # ROM bank, not editable
             )
             pcg.program_banks.append(bank)
         
         # g(d): GM2 Drum kits
+        drum_programs = []
+        cat_tuple = get_gm2_category("g(d)", 0)
+        drum_category = None
+        if cat_tuple:
+            drum_category = Category(
+                main_category=cat_tuple[0],
+                sub_category=cat_tuple[1]
+            )
+        
+        for index in range(128):
+            prog = Program(
+                bank="g(d)",
+                index=index,
+                name=get_gm2_program_name("g(d)", index),
+                engine="GM2",
+                osc_mode="Drums",
+                category=drum_category
+            )
+            drum_programs.append(prog)
+        
         bank = Bank(
             bank_id="g(d)",
             bank_type="Program",
-            patches=[],
-            is_placeholder=True
+            patches=drum_programs,
+            is_placeholder=False,  # Has actual data
+            is_read_only=True  # ROM bank, not editable
         )
         pcg.program_banks.append(bank)
     

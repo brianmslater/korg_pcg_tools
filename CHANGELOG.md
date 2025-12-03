@@ -5,6 +5,36 @@ All notable changes to PCG Tools Python will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added - GM2 Bank Support
+- **GM2 Banks Display**: Added support for viewing GM2 banks g(1)-g(9) and g(d)
+- **Read-Only ROM Banks**: GM2 banks are marked as read-only with [ROM] indicator
+- **Program Names**: 10 GM2 banks with descriptive program names
+  - g(1): Piano variations (Grand Piano KSP, Piano Strings, etc.)
+  - g(2): Chromatic Percussion (Celesta, Glockenspiel, etc.)
+  - g(3): Organ variations (Drawbar Organ, Rock Organ, etc.)
+  - g(4): Guitar variations (Nylon Guitar, Jazz Guitar, etc.)
+  - g(5): Bass variations (Acoustic Bass, Fingered Bass, etc.)
+  - g(6): Strings/Orchestra (Violin, Viola, Cello, etc.)
+  - g(7): Ensemble (String Ensemble, Choir Aahs, etc.)
+  - g(8): Brass (Trumpet, Trombone, French Horn, etc.)
+  - g(9): Reed/Pipe (Soprano Sax, Alto Sax, Oboe, Flute, etc.)
+  - g(d): Drum kits (Standard Kit, Room Kit, Power Kit, etc.)
+- **Category Information**: GM2 programs include proper category metadata
+- **GUI Integration**: 
+  - ROM banks show [ROM] indicator in bank selector
+  - Edit and Paste buttons disabled for ROM banks
+  - Copy from ROM banks is allowed
+  - Helpful error messages when trying to edit ROM banks
+- **Documentation**: Complete GM2 reference guide and implementation docs
+
+### Technical
+- Added `pcg_tools/gm2_data.py` with GM2 program definitions
+- Added `is_read_only` flag to Bank model
+- Updated GUI to handle read-only banks
+- Added `test_gm2_banks.py` and `test_gm_readonly.py` test scripts
+
 ## [1.3.0] - 2025-12-01 "Feature Complete"
 
 ### 🎉 Major Milestone: Feature Parity Achieved!

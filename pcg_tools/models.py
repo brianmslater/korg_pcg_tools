@@ -504,6 +504,7 @@ class Bank:
     bank_type: str  # 'Program', 'Combi', 'SetList'
     patches: List = field(default_factory=list)
     is_placeholder: bool = False  # True for unimplemented banks (g(1)-g(9), g(d))
+    is_read_only: bool = False  # True for ROM banks (GM, g(1)-g(9), g(d))
     
     def __len__(self):
         return len(self.patches)

@@ -134,7 +134,9 @@ class PcgBinaryParser:
         debug_print(f"  Decoded bank name: {bank_name}")
         
         # Create bank
-        bank = Bank(bank_id=bank_name, bank_type='Program')
+        # Mark GM bank as read-only (ROM bank)
+        is_read_only = (bank_name == "GM")
+        bank = Bank(bank_id=bank_name, bank_type='Program', is_read_only=is_read_only)
         
         # Read programs
         for i in range(min(num_programs, 128)):  # Max 128 per bank
@@ -226,7 +228,9 @@ class PcgBinaryParser:
         if programs:
             
             # Create bank
-            bank = Bank(bank_id=bank_id, bank_type='Program')
+            # Mark GM bank as read-only (ROM bank)
+            is_read_only = (bank_id == "GM")
+            bank = Bank(bank_id=bank_id, bank_type='Program', is_read_only=is_read_only)
             
             for idx, name, prog_offset in programs:
                 # Extract engine information
@@ -1424,20 +1428,83 @@ class PcgBinaryParser:
                     # Decode bank ID from bits 4-0 of byte 25
                     bank_id = bank_byte & 0x1F  # Extract bits 4-0
                     
-                    # Bank mapping:
-                    # 0-4: INT-A through INT-E
-                    # 5-11: USER-A through USER-G  
-                    # 12: GM
-                    if bank_id <= 4:
-                        patch_bank = f"I-{chr(65 + bank_id)}"  # INT-A to INT-E
-                    elif 5 <= bank_id <= 11:
-                        patch_bank = f"U-{chr(65 + (bank_id - 5))}"  # USER-A to USER-G
-                    elif bank_id == 12:
+                    # Bank mapping for setlist slots:
+                    # 0-6: I-A through I-G (Internal banks)
+                    # 7-13: U-A through U-G (User banks)
+                    # 14: GM
+                    # 15-23: g(1) through g(9) (EXi banks)
+                    # 24: g(d) (EXi drums)
+                    # 25-31: U-AA through U-GG (Extended user banks)
+                    if bank_id <= 6:
+                        patch_bank = f"I-{chr(65 + bank_id)}"  # I-A to I-G
+                    elif 7 <= bank_id <= 13:
+                        patch_bank = f"U-{chr(65 + (bank_id - 7))}"  # U-A to U-G
+                    elif bank_id == 14:
                         patch_bank = "GM"
+                    elif 15 <= bank_id <= 23:
+                        # g(1) through g(9)
+                        patch_bank = f"g({bank_id - 14})"
+                    elif bank_id == 24:
+                        patch_bank = "g(d)"
+                    elif 25 <= bank_id <= 31:
+                        # U-AA through U-GG (extended user banks)
+                        letter = chr(65 + (bank_id - 25))  # A-G
+                        patch_bank = f"U-{letter}{letter}"  # U-AA, U-BB, etc.
                     else:
                         patch_bank = f"?{bank_id}"
                     
                     patch_index = index_byte
+                    
+                    # IMPORTANT: STL1 patch type bits are unreliable in some files.
+                    # Verify the patch type by checking which bank actually has a patch.
+                    if patch_bank and patch_index is not None and pcg:
+                        # Check if a program exists at this location
+                        prog_exists = False
+                        for prog_bank in pcg.program_banks:
+                            if prog_bank.bank_id == patch_bank:
+                                if 0 <= patch_index < len(prog_bank.patches):
+                                    prog = prog_bank.patches[patch_index]
+                                    if prog and prog.name and not prog.name.startswith("[Empty"):
+                                        prog_exists = True
+                                break
+                        
+                        # Check if a combi exists at this location
+                        combi_exists = False
+                        for combi_bank in pcg.combi_banks:
+                            if combi_bank.bank_id == patch_bank:
+                                if 0 <= patch_index < len(combi_bank.patches):
+                                    combi = combi_bank.patches[patch_index]
+                                    if combi and combi.name and not combi.name.startswith("[Empty"):
+                                        combi_exists = True
+                                break
+                        
+                        # If both exist, prefer the one that matches the slot name
+                        if prog_exists and combi_exists:
+                            # Check which name matches better
+                            prog_name = ""
+                            combi_name = ""
+                            for prog_bank in pcg.program_banks:
+                                if prog_bank.bank_id == patch_bank and 0 <= patch_index < len(prog_bank.patches):
+                                    prog_name = prog_bank.patches[patch_index].name
+                                    break
+                            for combi_bank in pcg.combi_banks:
+                                if combi_bank.bank_id == patch_bank and 0 <= patch_index < len(combi_bank.patches):
+                                    combi_name = combi_bank.patches[patch_index].name
+                                    break
+                            
+                            # If slot name matches combi name, it's a combi
+                            if slot_name and combi_name and slot_name.lower() in combi_name.lower():
+                                patch_type = "Combi"
+                            elif slot_name and prog_name and slot_name.lower() in prog_name.lower():
+                                patch_type = "Program"
+                            # Otherwise, prefer combi if STL1 says program (common error)
+                            elif patch_type == "Program":
+                                patch_type = "Combi"
+                        # If only one exists, use that
+                        elif combi_exists and not prog_exists:
+                            patch_type = "Combi"
+                        elif prog_exists and not combi_exists:
+                            patch_type = "Program"
                 
                 # Find or create slot
                 slot = None
@@ -1484,3 +1551,103 @@ class PcgBinaryParser:
         
         debug_print(f"Finished parsing STL1: {setlists_parsed} setlists")
         pcg.has_set_lists = len(pcg.set_lists) > 0
+
+    def parse_slot_notes(self, pcg: PcgFile):
+        """Parse slot notes/comments from SLS1 chunk.
+        
+        Notes are stored in a separate section of the SLS1 chunk with the structure:
+        - Setlist name (24 bytes, mostly padding)
+        - Slot name (24 bytes)
+        - Metadata (12 bytes)
+        - Notes text (variable length, null-terminated)
+        
+        This section appears to be after the main setlist/slot name data.
+        """
+        if not pcg.set_lists:
+            return
+        
+        # Find SLS1 chunk
+        sls1_offset = self.data.find(b'SLS1')
+        if sls1_offset < 0:
+            debug_print("SLS1 chunk not found for notes parsing")
+            return
+        
+        sls1_size = self.get_int(sls1_offset + 4, 4)
+        sls1_end = sls1_offset + 8 + sls1_size
+        
+        debug_print(f"Parsing slot notes from SLS1 at {sls1_offset:08X}")
+        
+        # Search for setlist names in the notes section
+        # The notes section seems to start around offset 0xA0000+ in the test file
+        # But we'll search for setlist names to find the notes
+        
+        notes_found = 0
+        for setlist in pcg.set_lists:
+            # Search for this setlist's name in the SLS1 chunk
+            # The notes section has a specific structure with padding before the setlist name
+            search_start = sls1_offset + 0x2000  # Skip the main setlist data
+            
+            while search_start < sls1_end:
+                # Look for setlist name, but check for the structure:
+                # Usually there's padding (nulls) before the setlist name
+                setlist_name_bytes = setlist.name.encode('ascii')[:24]
+                name_offset = self.data.find(setlist_name_bytes, search_start, sls1_end)
+                
+                if name_offset < 0:
+                    break
+                
+                # Verify this looks like a notes entry by checking for nulls before it
+                # and that it's followed by a slot name
+                if name_offset >= 10:
+                    # Check if there are some null bytes before (indicating padding)
+                    has_padding = any(self.data[name_offset - i] == 0 for i in range(1, min(10, name_offset)))
+                    if not has_padding:
+                        search_start = name_offset + 1
+                        continue
+                
+                # Check if this looks like a notes entry (should have slot name after it)
+                slot_name_offset = name_offset + 24
+                if slot_name_offset + 24 > len(self.data):
+                    search_start = name_offset + 1
+                    continue
+                
+                # Read potential slot name
+                potential_slot_name = self.get_string(slot_name_offset, 24)
+                
+                # Check if this slot exists in our setlist
+                matching_slot = None
+                for slot in setlist.slots:
+                    if slot.name and potential_slot_name and slot.name.strip() == potential_slot_name.strip():
+                        matching_slot = slot
+                        break
+                
+                if matching_slot:
+                    # Found a notes entry! Parse the notes
+                    # Notes start after: slot name field (24 bytes) + metadata (12 bytes)
+                    # Important: slot_name_offset is the START of the 24-byte field, not where text begins
+                    notes_offset = slot_name_offset + 24 + 12
+                    
+                    # Read notes until null terminator or end of reasonable length
+                    notes_bytes = bytearray()
+                    max_notes_length = 4096  # Reasonable max
+                    for i in range(max_notes_length):
+                        if notes_offset + i >= len(self.data):
+                            break
+                        byte = self.data[notes_offset + i]
+                        if byte == 0:
+                            break
+                        notes_bytes.append(byte)
+                    
+                    if notes_bytes:
+                        try:
+                            notes_text = notes_bytes.decode('ascii', errors='replace')
+                            matching_slot.notes = notes_text
+                            notes_found += 1
+                            debug_print(f"Found notes for {setlist.name} slot {matching_slot.slot_index}: {len(notes_text)} chars")
+                        except Exception as e:
+                            debug_print(f"Error decoding notes: {e}")
+                
+                # Continue searching
+                search_start = name_offset + 1
+        
+        debug_print(f"Parsed {notes_found} slot notes")
