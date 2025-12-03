@@ -16,19 +16,18 @@ All core features have been implemented, tested, and verified on hardware. The a
 **Latest Updates**:
 - ✅ **GM2 Banks Support** - View all 10 GM2 banks (g(1)-g(9), g(d)) with 1,280 programs
 - ✅ **Read-Only ROM Banks** - Proper handling of ROM banks with copy support
-- ✅ **Simple Setlist Editor** - Hardware-tested GUI for setlist editing (v1.1)
-- ✅ Repository cleanup - Professional structure
+- ✅ **GUI Consolidation** - Single Qt-based GUI (removed legacy tkinter editors)
 - ✅ Complete setlist support - All 16 setlists with 128 slots each
-- ✅ Working PCG writer - Confirmed on Korg Kronos hardware
+- ✅ Working PCG writer - Confirmed on Korg Kronos 2 hardware
 - ✅ Full slot editing - Names, colors, transpose, volume, notes
 
 ---
 
 ## ✨ Features
 
-### GUI Application
-- ✅ **Qt-based GUI** - Modern, native-looking interface
-- ✅ **Hardware tested** - Confirmed working on Korg Kronos
+### GUI Application (Qt-based)
+- ✅ **Modern interface** - Single Qt-based GUI with native look and feel
+- ✅ **Hardware tested** - Confirmed working on Korg Kronos 2
 - ✅ **GM2 Banks** - View all 10 GM2 banks with 1,280 programs (read-only)
 - ✅ **ROM Bank Protection** - Cannot accidentally edit ROM banks
 - ✅ **Edit setlist names** - All 16 setlists supported
@@ -38,6 +37,8 @@ All core features have been implemented, tested, and verified on hardware. The a
 - ✅ **Copy and paste** - Patches and setlist slots (including from ROM banks)
 - ✅ **Batch operations** - Sort, compact, and organize
 - ✅ **Keyboard shortcuts** - Full keyboard navigation
+
+**Note:** Legacy tkinter-based editors have been removed. Use the Qt GUI for all editing.
 
 ### Core Functionality
 - ✅ **Open and save** PCG files from all Korg synthesizers
@@ -49,9 +50,10 @@ All core features have been implemented, tested, and verified on hardware. The a
 - ✅ **Command-line interface** for automation and batch processing
 
 ### User Interface
-- ✅ **Qt GUI** - Full-featured graphical interface
+- ✅ **Qt GUI** - Single, full-featured graphical interface (PySide6)
 - ✅ **Command-line tools** - Full API access via CLI
 - ✅ **Cross-platform** - Works on Windows, macOS, and Linux
+- ⚠️ **Legacy editors removed** - Old tkinter-based simple editor no longer included
 
 ---
 
@@ -136,26 +138,35 @@ pip install -r requirements.txt
 
 ---
 
-## ⌨️ Keyboard Shortcuts (Simple Setlist Editor)
+## ⌨️ Keyboard Shortcuts (Qt GUI)
 
 | Shortcut | Action |
 |----------|--------|
 | **Ctrl+O** | Open PCG file |
 | **Ctrl+S** | Save file |
 | **Ctrl+Shift+S** | Save As |
-| **Ctrl+Q** | Quit |
-| **Double-click** | Edit slot |
-| **Return** | Edit selected slot |
+| **Ctrl+N** | New window |
+| **Ctrl+W** | Close window |
+| **Ctrl+Q** | Quit all windows |
+| **Ctrl+C** | Copy selected item |
+| **Ctrl+V** | Paste item |
+| **Ctrl+X** | Cut item |
+| **Double-click** | Edit item |
 | **Right-click** | Context menu |
 
 ---
 
-## 🖱️ Context Menu (Simple Setlist Editor)
+## 🖱️ Context Menu (Qt GUI)
 
-Right-click on any slot to access:
-- Edit Slot
-- Clear Slot
-- Copy Slot Name
+Right-click on items to access:
+- Edit
+- Copy
+- Paste
+- Cut
+- Clear
+- Move Up/Down
+- Sort
+- Compact
 
 ---
 
@@ -188,18 +199,29 @@ python -m pcg_tools export file.pcg output.txt --format txt
 
 ## 🎯 Common Tasks
 
-### Edit Setlist Names
-1. Launch Simple Setlist Editor: `./edit-setlists`
-2. Open your PCG file
-3. Select a setlist from dropdown
-4. Click "Edit Setlist Name"
-5. Save the file
+### Edit Setlists and Slots
+1. Launch Qt GUI: `python3 -m pcg_tools.gui_qt`
+2. Open your PCG file (Ctrl+O)
+3. Go to Setlists tab
+4. Select a setlist from dropdown
+5. Double-click any slot to edit
+6. Edit name, color, text size, transpose, volume, or notes
+7. Save the file (Ctrl+S)
 
-### Edit Slot Properties
-1. Double-click any slot in the table
-2. Edit name, color, text size, transpose, volume, or notes
-3. Click "Save"
-4. Save the file when done
+### Edit Programs and Combis
+1. Launch Qt GUI
+2. Go to Programs or Combis tab
+3. Select a bank from the list
+4. Double-click a program/combi to edit
+5. Modify name, category, or other properties
+6. Save the file
+
+### View GM2 Banks
+1. Launch Qt GUI
+2. Go to Programs tab
+3. Scroll down in bank list to g(1) through g(9) and g(d)
+4. Click any GM2 bank to view programs
+5. Copy programs to user banks if desired (Edit/Paste disabled for ROM banks)
 
 ### Generate Reports
 ```bash
@@ -231,7 +253,7 @@ python -m pcg_tools export yourfile.PCG patches.csv
 
 ## 🧪 Hardware Testing
 
-The Simple Setlist Editor has been extensively tested on **Korg Kronos hardware**:
+PCG Tools has been extensively tested on **Korg Kronos 2 hardware**:
 
 ✅ **Setlist name editing** - Works perfectly
 ✅ **Slot name editing** - Works perfectly  
@@ -239,9 +261,13 @@ The Simple Setlist Editor has been extensively tested on **Korg Kronos hardware*
 ✅ **Text size changes** - Display correctly on hardware
 ✅ **Transpose settings** - Function correctly
 ✅ **Volume settings** - Function correctly
+✅ **Program/Combi editing** - Works correctly
 ✅ **File integrity** - Files load without errors
+✅ **GM2 Banks** - Display correctly (read-only)
 
-**Test files created and verified on actual Kronos hardware.**
+**Test files created and verified on actual Korg Kronos 2 hardware.**
+
+**Note:** Testing performed on Kronos 2. Should work on original Kronos and Kronos X, but not yet verified.
 
 ---
 
@@ -251,21 +277,23 @@ The Simple Setlist Editor has been extensively tested on **Korg Kronos hardware*
 korg_pcg_tools/
 ├── README.md                    # This file
 ├── INSTALL.md                   # Installation guide
-├── SIMPLE_EDITOR_GUIDE.md       # Setlist editor guide
-├── simple_setlist_editor.py     # Setlist editor (recommended!)
-├── edit-setlists                # Launcher script
+├── USAGE.md                     # Usage guide
+├── GM2_BANKS_REFERENCE.md       # GM2 banks reference
 │
 ├── pcg_tools/                   # Main package
 │   ├── models.py                # Data structures
 │   ├── pcg_parser.py            # PCG file parser
+│   ├── reader.py                # PCG file reader
 │   ├── writer.py                # PCG file writer (hardware-tested)
+│   ├── gui_qt.py                # Qt-based GUI
+│   ├── gm2_data.py              # GM2 bank definitions
 │   ├── cli.py                   # Command-line interface
 │   ├── bit_utils.py             # Binary utilities
 │   └── ...
 │
 ├── docs/                        # Additional documentation
 ├── examples/                    # Usage examples
-└── archive/                     # Development scripts (local only)
+└── test_files/                  # Test PCG files
 ```
 
 See [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) for complete details.
@@ -295,28 +323,36 @@ See [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) for complete details.
 
 ## 🐛 Troubleshooting
 
-### Simple Setlist Editor Won't Launch
+### Qt GUI Won't Launch
 ```bash
 # Check Python installation
 python3 --version
 
-# Check tkinter
-python3 -m tkinter
+# Check PySide6
+python3 -c "import PySide6; print('PySide6 OK')"
 ```
 
-If tkinter is missing:
-- **macOS**: `brew install python-tk@3.12`
-- **Ubuntu/Debian**: `sudo apt install python3-tk`
-- **Windows**: Reinstall Python with tkinter option
+If PySide6 is missing:
+```bash
+pip install PySide6
+```
 
 ### File Won't Open
 - Verify file is a valid PCG format
 - Check file isn't corrupted
 - Try with a different file
+- Check file permissions
 
-### File Won't Load on Kronos
-- This shouldn't happen with Simple Setlist Editor!
-- If it does, please report the issue with your PCG file
+### File Won't Load on Kronos 2
+- Verify file was saved successfully
+- Check file size matches original
+- Test on USB drive first before copying to internal SSD
+- If issues persist, please report with your PCG file
+
+### GM2 Banks Not Showing
+- GM2 banks are automatically added when opening any PCG file
+- Scroll down in the Programs bank list to see g(1) through g(9) and g(d)
+- Look for [ROM] indicator next to bank names
 
 See [KNOWN_ISSUES.md](KNOWN_ISSUES.md) for more details.
 
@@ -327,19 +363,19 @@ See [KNOWN_ISSUES.md](KNOWN_ISSUES.md) for more details.
 Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ### Areas for Enhancement
-- Patch reference editing in Simple Setlist Editor
-- Batch operations (apply settings to multiple slots)
-- Undo/redo in Simple Setlist Editor
-- Fix main GUI writer issues
+- Complete GM2 program names (currently 92 of 1,280 named)
+- Undo/redo functionality
+- Timbre editing in GUI
 - Additional export formats
 - More automation examples
+- Hardware testing on original Kronos and Kronos X
 
 ### Development
 ```bash
-git clone https://github.com/yourusername/korg-pcg-tools.git
-cd korg-pcg-tools
+git clone https://github.com/brianmslater/korg_pcg_tools.git
+cd korg_pcg_tools
 pip install -r requirements.txt
-python3 simple_setlist_editor.py
+python3 -m pcg_tools.gui_qt
 ```
 
 ---
@@ -363,11 +399,12 @@ Inspired by the original PCG Tools by Michel Keijzers.
 ## 📞 Support
 
 For help:
-1. Check the [SIMPLE_EDITOR_GUIDE.md](SIMPLE_EDITOR_GUIDE.md) for setlist editing
-2. See [INSTALL.md](INSTALL.md) for installation issues
-3. Review [KNOWN_ISSUES.md](KNOWN_ISSUES.md) for limitations
-4. Check [USAGE.md](USAGE.md) for CLI commands
-5. Open an issue on GitHub for bugs or questions
+1. Check [USAGE.md](USAGE.md) for GUI and CLI usage
+2. See [GM2_BANKS_REFERENCE.md](GM2_BANKS_REFERENCE.md) for GM2 banks info
+3. Review [INSTALL.md](INSTALL.md) for installation issues
+4. Check [KNOWN_ISSUES.md](KNOWN_ISSUES.md) for limitations
+5. See [QUICKSTART.md](QUICKSTART.md) for quick start guide
+6. Open an issue on GitHub for bugs or questions
 
 ---
 
@@ -376,8 +413,8 @@ For help:
 **Version:** 1.4.0 "GM2 Banks"  
 **Date:** December 2, 2025  
 **Status:** ✅ Production Ready - Feature Parity Achieved!  
-**Hardware Tested:** ✅ Korg Kronos  
-**Recommended Tool:** PCG Tools GUI (complete editing suite)  
+**Hardware Tested:** ✅ Korg Kronos 2  
+**GUI:** Qt-based (PySide6) - Legacy tkinter editors removed  
 **New:** ✅ GM2 Banks Support (10 banks, 1,280 programs)  
 
 ---
