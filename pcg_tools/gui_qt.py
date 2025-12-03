@@ -349,6 +349,8 @@ class PcgMainWindow(QMainWindow):
         self.timbres_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.timbres_table.doubleClicked.connect(self.edit_timbre)
         self.timbres_table.cellClicked.connect(self.on_timbre_cell_clicked)
+        self.timbres_table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.timbres_table.customContextMenuRequested.connect(self.show_timbre_context_menu)
         
         layout.addWidget(self.timbres_table, stretch=1)
         
@@ -1927,6 +1929,158 @@ class PcgMainWindow(QMainWindow):
                     self.mark_dirty()
                     self.load_setlist_slots()
                 break
+    
+    def show_timbre_context_menu(self, position):
+        """Show context menu for timbres table."""
+        menu = QMenu()
+        
+        edit_action = menu.addAction("Edit Timbre")
+        edit_action.triggered.connect(self.edit_timbre_selected)
+        
+        menu.addSeparator()
+        
+        move_up_action = menu.addAction("Move Up")
+        move_up_action.triggered.connect(self.move_timbre_up)
+        
+        move_down_action = menu.addAction("Move Down")
+        move_down_action.triggered.connect(self.move_timbre_down)
+        
+        menu.addSeparator()
+        
+        clear_action = menu.addAction("Clear Timbre")
+        clear_action.triggered.connect(self.clear_timbre_selected)
+        
+        menu.addSeparator()
+        
+        sort_menu = menu.addMenu("Sort Timbres")
+        sort_menu.addAction("By MIDI Channel").triggered.connect(lambda: self.sort_timbres("channel"))
+        sort_menu.addAction("By Program").triggered.connect(lambda: self.sort_timbres("program"))
+        sort_menu.addAction("By Status").triggered.connect(lambda: self.sort_timbres("status"))
+        
+        menu.addSeparator()
+        
+        clear_unused_action = menu.addAction("Clear Unused Timbres")
+        clear_unused_action.triggered.connect(self.clear_unused_timbres)
+        
+        menu.exec_(self.timbres_table.viewport().mapToGlobal(position))
+    
+    def edit_timbre_selected(self):
+        """Edit selected timbre."""
+        selected_rows = self.timbres_table.selectedItems()
+        if selected_rows:
+            row = selected_rows[0].row()
+            # Get the selected combi
+            combi = self._get_selected_combi()
+            if combi and row < len(combi.timbres):
+                self.edit_timbre(combi.timbres[row])
+    
+    def move_timbre_up(self):
+        """Move selected timbre up."""
+        if not self.pcg:
+            return
+        
+        selected_rows = self.timbres_table.selectedItems()
+        if not selected_rows:
+            return
+        
+        row = selected_rows[0].row()
+        combi = self._get_selected_combi()
+        
+        if combi:
+            from .batch_operations import BatchOperations
+            if BatchOperations.move_timbre_up(combi, row):
+                self.mark_dirty()
+                self.load_combi_timbres()
+                self.timbres_table.selectRow(row - 1)
+    
+    def move_timbre_down(self):
+        """Move selected timbre down."""
+        if not self.pcg:
+            return
+        
+        selected_rows = self.timbres_table.selectedItems()
+        if not selected_rows:
+            return
+        
+        row = selected_rows[0].row()
+        combi = self._get_selected_combi()
+        
+        if combi:
+            from .batch_operations import BatchOperations
+            if BatchOperations.move_timbre_down(combi, row):
+                self.mark_dirty()
+                self.load_combi_timbres()
+                self.timbres_table.selectRow(row + 1)
+    
+    def clear_timbre_selected(self):
+        """Clear selected timbre."""
+        if not self.pcg:
+            return
+        
+        selected_rows = self.timbres_table.selectedItems()
+        if not selected_rows:
+            QMessageBox.warning(self, "No Selection", "Please select a timbre to clear")
+            return
+        
+        row = selected_rows[0].row()
+        combi = self._get_selected_combi()
+        
+        if combi:
+            reply = QMessageBox.question(
+                self,
+                "Clear Timbre",
+                f"Clear timbre {row + 1}?",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            
+            if reply == QMessageBox.Yes:
+                from .batch_operations import BatchOperations
+                if BatchOperations.clear_timbre(combi, row):
+                    self.mark_dirty()
+                    self.load_combi_timbres()
+    
+    def sort_timbres(self, key):
+        """Sort timbres in selected combi."""
+        if not self.pcg:
+            return
+        
+        combi = self._get_selected_combi()
+        if combi:
+            from .batch_operations import BatchOperations
+            BatchOperations.sort_timbres(combi, key)
+            self.mark_dirty()
+            self.load_combi_timbres()
+            QMessageBox.information(self, "Sorted", f"Timbres sorted by {key}")
+    
+    def clear_unused_timbres(self):
+        """Clear unused timbres in selected combi."""
+        if not self.pcg:
+            return
+        
+        combi = self._get_selected_combi()
+        if combi:
+            reply = QMessageBox.question(
+                self,
+                "Clear Unused Timbres",
+                "Clear all muted or OFF timbres?",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            
+            if reply == QMessageBox.Yes:
+                from .batch_operations import BatchOperations
+                cleared = BatchOperations.clear_unused_timbres(combi)
+                self.mark_dirty()
+                self.load_combi_timbres()
+                QMessageBox.information(self, "Cleared", f"Cleared {cleared} unused timbres")
+    
+    def _get_selected_combi(self):
+        """Get currently selected combi."""
+        selected_rows = self.combis_table.selectedItems()
+        if not selected_rows:
+            return None
+        
+        row = selected_rows[0].row()
+        return self._get_combi_at_row(row)
     
     def on_notes_changed(self):
         """Handle notes text change."""

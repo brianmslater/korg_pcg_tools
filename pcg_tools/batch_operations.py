@@ -261,3 +261,117 @@ class BatchOperations:
         setlist.slots[index+1].slot_index = index + 1
         
         return True
+
+    # Timbre Operations
+    
+    @staticmethod
+    def move_timbre_up(combi: Combi, index: int) -> bool:
+        """Move timbre up one position in combi.
+        
+        Args:
+            combi: Combi containing the timbre
+            index: Current index of timbre to move
+        
+        Returns:
+            True if moved, False if already at top
+        """
+        if index <= 0 or index >= len(combi.timbres):
+            return False
+        
+        # Swap with previous
+        combi.timbres[index], combi.timbres[index-1] = combi.timbres[index-1], combi.timbres[index]
+        
+        return True
+    
+    @staticmethod
+    def move_timbre_down(combi: Combi, index: int) -> bool:
+        """Move timbre down one position in combi.
+        
+        Args:
+            combi: Combi containing the timbre
+            index: Current index of timbre to move
+        
+        Returns:
+            True if moved, False if already at bottom
+        """
+        if index < 0 or index >= len(combi.timbres) - 1:
+            return False
+        
+        # Swap with next
+        combi.timbres[index], combi.timbres[index+1] = combi.timbres[index+1], combi.timbres[index]
+        
+        return True
+    
+    @staticmethod
+    def clear_timbre(combi: Combi, index: int) -> bool:
+        """Clear/initialize a timbre in a combi.
+        
+        Args:
+            combi: Combi containing the timbre
+            index: Index of timbre to clear
+        
+        Returns:
+            True if cleared, False if index invalid
+        """
+        if index < 0 or index >= len(combi.timbres):
+            return False
+        
+        from .models import Timbre
+        
+        # Create a new initialized timbre
+        combi.timbres[index] = Timbre(
+            program_bank="I-A",
+            program_index=0,
+            midi_channel=index,
+            status="INT",
+            volume=127,
+            pan=64,
+            mute=False,
+            priority=False,
+            detune=0,
+            transpose=0,
+            portamento=0,
+            osc_mode="Prg",
+            osc_select="Both",
+            bottom_key=0,
+            top_key=127,
+            bottom_velocity=1,
+            top_velocity=127
+        )
+        
+        return True
+    
+    @staticmethod
+    def sort_timbres(combi: Combi, key: str = "channel", reverse: bool = False):
+        """Sort timbres in a combi.
+        
+        Args:
+            combi: Combi to sort
+            key: Sort key - "channel", "program", "status"
+            reverse: If True, sort in descending order
+        """
+        if key == "channel":
+            combi.timbres.sort(key=lambda t: t.midi_channel, reverse=reverse)
+        elif key == "program":
+            combi.timbres.sort(key=lambda t: t.program_id, reverse=reverse)
+        elif key == "status":
+            combi.timbres.sort(key=lambda t: t.status, reverse=reverse)
+    
+    @staticmethod
+    def clear_unused_timbres(combi: Combi) -> int:
+        """Clear timbres that are muted or have status OFF.
+        
+        Args:
+            combi: Combi to clean up
+        
+        Returns:
+            Number of timbres cleared
+        """
+        cleared = 0
+        
+        for i, timbre in enumerate(combi.timbres):
+            if timbre.mute or timbre.status == "OFF":
+                BatchOperations.clear_timbre(combi, i)
+                cleared += 1
+        
+        return cleared

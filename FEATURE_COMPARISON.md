@@ -93,7 +93,7 @@ This document compares features between the original C# PCG Tools and the Python
 | Auto-fill slots | ✅ | ✅ | **NEW in v1.2.6** |
 | Copy slots | ✅ | ✅ | **NEW in v1.2.2** |
 | Paste slots | ✅ | ✅ | **NEW in v1.2.2** |
-| Move slots up/down | ✅ | ❌ | |
+| Move slots up/down | ✅ | ✅ | **NEW in v1.2.5** |
 | Clear slots | ✅ | ✅ | With confirmation |
 | Sort slots | ✅ | ✅ | **NEW in v1.3.0** |
 
@@ -115,10 +115,10 @@ This document compares features between the original C# PCG Tools and the Python
 | Edit timbre priority | ✅ | ✅ | Parsed, not tested |
 | Edit timbre osc mode | ✅ | ✅ | Parsed, not tested |
 | Edit timbre portamento | ✅ | ✅ | Parsed, not tested |
-| Move timbres up/down | ✅ | ❌ | |
-| Clear timbres | ✅ | ❌ | |
-| Sort timbres | ✅ | ❌ | |
-| Clear unused timbres | ✅ | ❌ | |
+| Move timbres up/down | ✅ | ✅ | **NEW in v1.4.1** |
+| Clear timbres | ✅ | ✅ | **NEW in v1.4.1** |
+| Sort timbres | ✅ | ✅ | **NEW in v1.4.1** |
+| Clear unused timbres | ✅ | ✅ | **NEW in v1.4.1** |
 
 ---
 

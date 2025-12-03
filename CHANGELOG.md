@@ -7,7 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added - GM2 Bank Support
+### Added - Timbre Operations (v1.4.1)
+- **Move Timbres Up/Down** - Reorder timbres within combis
+- **Clear Timbre** - Initialize a timbre to default values
+- **Sort Timbres** - Sort by MIDI channel, program, or status
+- **Clear Unused Timbres** - Remove muted or OFF timbres
+- **Timbre Context Menu** - Right-click menu for all timbre operations
+
+### Added - GM2 Bank Support (v1.4.0)
 - **GM2 Banks Display**: Added support for viewing GM2 banks g(1)-g(9) and g(d)
 - **Read-Only ROM Banks**: GM2 banks are marked as read-only with [ROM] indicator
 - **Program Names**: 10 GM2 banks with descriptive program names
