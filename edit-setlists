@@ -1,5 +1,0 @@
-#!/bin/bash
-# Simple Setlist Editor launcher
-
-cd "$(dirname "$0")"
-python3 simple_setlist_editor.py

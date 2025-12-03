@@ -20,11 +20,9 @@ korg_pcg_tools/
 ├── setup.py                     # Package setup
 │
 ├── pcg-tools                    # Main CLI launcher (Unix)
-├── edit-setlists                # Setlist editor launcher (Unix)
 ├── launch_gui.bat               # GUI launcher (Windows)
 ├── launch_gui_fixed.sh          # GUI launcher (Unix)
 ├── run_gui_macos.sh             # GUI launcher (macOS)
-├── simple_setlist_editor.py     # Standalone setlist editor
 │
 ├── pcg_tools/                   # Main application package
 │   ├── __init__.py
@@ -32,8 +30,8 @@ korg_pcg_tools/
 │   ├── models.py                # Data models
 │   ├── pcg_parser.py            # PCG file parser
 │   ├── writer.py                # PCG file writer
-│   ├── gui_qt.py                # Main GUI (Qt)
-│   ├── edit_dialog.py           # Edit dialogs
+│   ├── gui_qt.py                # Main GUI (Qt-based)
+│   ├── qt_edit_dialog.py        # Qt edit dialogs
 │   ├── bit_utils.py             # Binary utilities
 │   └── ...
 │
@@ -74,10 +72,9 @@ korg_pcg_tools/
 
 ### Launchers
 - **pcg-tools** - Main CLI entry point (Unix/macOS)
-- **edit-setlists** - Quick setlist editor launcher
 - **launch_gui.bat** - Windows GUI launcher
 - **run_gui_macos.sh** - macOS GUI launcher
-- **simple_setlist_editor.py** - Standalone editor (all platforms)
+- **python3 -m pcg_tools.gui_qt** - Direct GUI launch (all platforms)
 
 ## Application Package (pcg_tools/)
 
@@ -86,9 +83,11 @@ The main Python package containing:
 - **models.py** - PCG data structures (Program, Combi, Setlist, etc.)
 - **pcg_parser.py** - Binary PCG file parser
 - **writer.py** - PCG file writer (hardware-tested)
-- **gui_qt.py** - Qt-based graphical interface
-- **edit_dialog.py** - Patch editing dialogs
+- **gui_qt.py** - Qt-based graphical interface (comprehensive GUI)
+- **qt_edit_dialog.py** - Qt-based patch editing dialogs
 - **bit_utils.py** - Binary manipulation utilities
+
+**Note**: The project uses Qt (PySide6) for the GUI, providing a modern, native-looking interface across all platforms.
 
 ## Excluded from Git
 
@@ -134,4 +133,4 @@ If you're using PCG Tools:
 2. Follow INSTALL.md for your platform
 3. Try QUICKSTART.md to get started
 4. Reference USAGE.md for detailed features
-5. Use SIMPLE_EDITOR_GUIDE.md for setlist editing
+5. Launch the GUI with `python3 -m pcg_tools.gui_qt`

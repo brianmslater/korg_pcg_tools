@@ -113,7 +113,23 @@ python3 simple_setlist_editor.py
 
 ## Nice to Have
 
-### 10. Create Demo GIF/Video
+### 10. Consolidate to Single QT GUI ✅ COMPLETE
+Remove ALL tkinter GUI code and use only QT:
+- [x] Remove old tkinter edit_dialog.py
+- [x] Remove old gui.py, gui_macos.py, gui_additions.py, gui_complete.py
+- [x] Remove test_edit_dialog.py (replaced by test_qt_dialog.py)
+- [x] Remove simple_setlist_editor.py (tkinter-based)
+- [x] Remove SIMPLE_EDITOR_GUIDE.md
+- [x] Remove edit-setlists launcher
+- [x] Update all documentation to reference only Qt GUI
+- [x] Update requirements.txt to make PySide6 required
+- [x] Verified no remaining imports of deleted files
+
+**Status**: ✅ COMPLETE
+
+**Result**: Project now has ONE GUI - the Qt-based gui_qt.py with qt_edit_dialog.py. Launch with `python3 -m pcg_tools.gui_qt`
+
+### 11. Create Demo GIF/Video
 Short demo showing:
 - Opening a file
 - Editing a setlist name
@@ -122,7 +138,7 @@ Short demo showing:
 
 **Status**: ⏳ Optional
 
-### 11. Add Badges to README
+### 12. Add Badges to README
 Consider adding:
 - License badge
 - Python version badge
@@ -130,7 +146,7 @@ Consider adding:
 
 **Status**: ⏳ Optional
 
-### 12. Set Up GitHub Issues
+### 13. Set Up GitHub Issues
 Create initial issues for:
 - [ ] Program/Combi editing GUI
 - [ ] Copy/paste operations
