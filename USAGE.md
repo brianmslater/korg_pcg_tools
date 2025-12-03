@@ -79,8 +79,10 @@ The GUI provides:
    - Save As to create new files
 
 2. **Programs Tab**
-   - View all program banks
+   - View all program banks (including GM2 banks)
    - See program names, categories, and favorites
+   - GM2 banks (g(1)-g(9), g(d)) shown with [ROM] indicator
+   - Copy from ROM banks (edit/paste disabled)
 
 3. **Combis Tab**
    - View all combi banks

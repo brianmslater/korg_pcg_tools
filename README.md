@@ -14,6 +14,8 @@
 All core features have been implemented, tested, and verified on hardware. The application is **ready for daily use**.
 
 **Latest Updates**:
+- ✅ **GM2 Banks Support** - View all 10 GM2 banks (g(1)-g(9), g(d)) with 1,280 programs
+- ✅ **Read-Only ROM Banks** - Proper handling of ROM banks with copy support
 - ✅ **Simple Setlist Editor** - Hardware-tested GUI for setlist editing (v1.1)
 - ✅ Repository cleanup - Professional structure
 - ✅ Complete setlist support - All 16 setlists with 128 slots each
@@ -24,14 +26,18 @@ All core features have been implemented, tested, and verified on hardware. The a
 
 ## ✨ Features
 
-### Setlist Editing (NEW!)
-- ✅ **Simple Setlist Editor** - Clean, reliable GUI for setlist editing
+### GUI Application
+- ✅ **Qt-based GUI** - Modern, native-looking interface
 - ✅ **Hardware tested** - Confirmed working on Korg Kronos
+- ✅ **GM2 Banks** - View all 10 GM2 banks with 1,280 programs (read-only)
+- ✅ **ROM Bank Protection** - Cannot accidentally edit ROM banks
 - ✅ **Edit setlist names** - All 16 setlists supported
 - ✅ **Edit slot properties** - Names, colors, text sizes, transpose, volume, notes
-- ✅ **Recent files** - Quick access to last 10 files
-- ✅ **Window memory** - Remembers position and size
-- ✅ **Keyboard shortcuts** - Ctrl+O, Ctrl+S, and more
+- ✅ **Patch name lookup** - Shows actual program/combi names for each slot
+- ✅ **Edit patches** - Modify program and combi properties
+- ✅ **Copy and paste** - Patches and setlist slots (including from ROM banks)
+- ✅ **Batch operations** - Sort, compact, and organize
+- ✅ **Keyboard shortcuts** - Full keyboard navigation
 
 ### Core Functionality
 - ✅ **Open and save** PCG files from all Korg synthesizers
@@ -43,7 +49,7 @@ All core features have been implemented, tested, and verified on hardware. The a
 - ✅ **Command-line interface** for automation and batch processing
 
 ### User Interface
-- ✅ **Simple Setlist Editor** - Recommended for setlist editing
+- ✅ **Qt GUI** - Full-featured graphical interface
 - ✅ **Command-line tools** - Full API access via CLI
 - ✅ **Cross-platform** - Works on Windows, macOS, and Linux
 
@@ -51,24 +57,20 @@ All core features have been implemented, tested, and verified on hardware. The a
 
 ## 🚀 Quick Start
 
-### Simple Setlist Editor (Recommended)
+### GUI Application
 ```bash
 cd korg_pcg_tools
-./edit-setlists
-```
-
-Or:
-```bash
-python3 simple_setlist_editor.py
+python3 -m pcg_tools.gui_qt
 ```
 
 **Features:**
-- Edit setlist and slot names
-- Change colors and text sizes
-- Adjust transpose and volume
+- View GM2 banks (g(1)-g(9), g(d)) with 1,280 programs
+- Edit setlists and slots
+- View actual patch names for each slot
+- Edit programs and combis
+- Copy/paste operations (including from ROM banks)
+- Batch operations
 - Hardware-tested and working!
-
-See [SIMPLE_EDITOR_GUIDE.md](SIMPLE_EDITOR_GUIDE.md) for details.
 
 ### Command-Line Interface
 ```bash
@@ -90,10 +92,13 @@ python -m pcg_tools --help
 ## 📋 Requirements
 
 - **Python 3.7 or higher**
-- **tkinter** (included with Python)
+- **PySide6** (for GUI) - `pip install PySide6`
 - **click** (for CLI) - `pip install click`
 
-That's it! No other dependencies required.
+Or install all at once:
+```bash
+pip install -r requirements.txt
+```
 
 ---
 
@@ -119,9 +124,11 @@ That's it! No other dependencies required.
 
 ### User Guides
 - **[USAGE.md](USAGE.md)** - Detailed usage instructions
+- **[GM2_BANKS_REFERENCE.md](GM2_BANKS_REFERENCE.md)** - GM2 banks quick reference
 - **[KNOWN_ISSUES.md](KNOWN_ISSUES.md)** - Known limitations and workarounds
 
 ### Technical Documentation
+- **[GM_BANKS_IMPLEMENTATION.md](GM_BANKS_IMPLEMENTATION.md)** - GM2 banks technical details
 - **[docs/TECHNICAL_REFERENCE.md](docs/TECHNICAL_REFERENCE.md)** - PCG file format details
 - **[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)** - Repository organization
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** - Developer guide
@@ -366,11 +373,12 @@ For help:
 
 ## 🎊 Status
 
-**Version:** 1.3.0 "Feature Complete"  
-**Date:** December 1, 2025  
+**Version:** 1.4.0 "GM2 Banks"  
+**Date:** December 2, 2025  
 **Status:** ✅ Production Ready - Feature Parity Achieved!  
 **Hardware Tested:** ✅ Korg Kronos  
 **Recommended Tool:** PCG Tools GUI (complete editing suite)  
+**New:** ✅ GM2 Banks Support (10 banks, 1,280 programs)  
 
 ---
 

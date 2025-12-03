@@ -53,6 +53,9 @@ This document compares features between the original C# PCG Tools and the Python
 |---------|----|----|-------|
 | View programs | ✅ | ✅ | GUI + CLI |
 | View combis | ✅ | ✅ | GUI + CLI |
+| View GM2 banks | ❌ | ✅ | **NEW in v1.4.0** - 10 banks, 1,280 programs |
+| ROM bank protection | ❌ | ✅ | **NEW in v1.4.0** - Cannot edit ROM banks |
+| Copy from ROM banks | ❌ | ✅ | **NEW in v1.4.0** - Copy GM2 programs |
 | Edit program names | ✅ | ✅ | **NEW in v1.2.0** |
 | Edit combi names | ✅ | ✅ | **NEW in v1.2.0** |
 | Edit categories | ✅ | ✅ | **NEW in v1.2.0** |
