@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
-"""Test script for timbre operations."""
+"""Test script for timbre operations.
 
+This is a standalone script, not a pytest test.
+Run with: python test_timbre_operations.py <pcg_file>
+"""
+
+import pytest
 import sys
 from pathlib import Path
 
@@ -10,7 +15,8 @@ from pcg_tools.reader import read_pcg_file
 from pcg_tools.batch_operations import BatchOperations
 
 
-def test_timbre_operations(pcg_path: str):
+@pytest.mark.skip(reason="Standalone script - requires command line argument")
+def test_timbre_operations(pcg_path: str = None):
     """Test timbre operations on a PCG file.
     
     Args:

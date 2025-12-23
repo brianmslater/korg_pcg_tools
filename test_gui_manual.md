@@ -1,10 +1,69 @@
-# Manual GUI Testing Guide for v1.2.0
+# Manual GUI Testing Guide for v1.3.0+
+
+## Test Files
+Use the PCG file in `files_2_test/nw.PCG` for testing.
+
+## New Features to Test
+
+### Feature 1: Undo/Redo Support
+1. Run the GUI: `python3 -m pcg_tools.gui_qt`
+2. Open `files_2_test/nw.PCG`
+3. Edit a program name
+4. Press **Ctrl+Z** (or Edit → Undo)
+5. Verify the name reverts to original
+6. Press **Ctrl+Shift+Z** (or Edit → Redo)
+7. Verify the name changes back
+8. Make multiple edits, verify undo stack works for all
+
+### Feature 2: Cross-File Copy/Paste
+1. Open a PCG file in the first window
+2. File → New Window to open a second window
+3. Open a different PCG file in the second window
+4. In the destination window, select a program slot
+5. Edit → Paste from Other Window...
+6. Select the source file and patches to copy
+7. Click OK and verify patches are copied
+8. For combis, verify program remapping dialog appears
+
+### Feature 3: Engine Type Validation
+1. Open a PCG file with HD-1 programs in a bank
+2. Try to paste an EXi program (AL-1, CX-3, etc.) into that bank
+3. Verify warning message appears about engine mismatch
+4. Verify paste is blocked to prevent hardware errors
+
+### Feature 4: Save As
+1. Open a PCG file
+2. File → Save As...
+3. Choose a new filename
+4. Verify new file is created
+5. Verify original file is unchanged
+6. Open the new file and verify contents match
+
+### Feature 5: Create User Bank
+1. Open a PCG file
+2. Tools → Create User Bank...
+3. Select a bank that doesn't exist (e.g., U-A, U-B)
+4. Click OK
+5. Verify the new bank appears in the bank list
+6. Verify the bank has 128 empty program slots
+7. Save the file and reload to verify persistence
+
+### Feature 6: Missing Bank Auto-Creation
+1. Open two PCG files in separate windows
+2. In the source file, select programs from a user bank (e.g., U-FF)
+3. In the destination file (which doesn't have U-FF), try to paste
+4. Edit → Paste from Other Window...
+5. If the destination doesn't have the source bank, verify prompt appears
+6. Click Yes to create the missing bank
+7. Verify the bank is created and paste succeeds
+
+---
 
 ## Test the Edit Functionality
 
 ### Setup
 1. Run the GUI: `python3 -m pcg_tools.gui_qt`
-2. Open a test PCG file: `test_files/files/GLAM V3/GLAMV3.PCG`
+2. Open a test PCG file
 
 ### Test 1: Edit Program
 1. Go to the **Programs** tab

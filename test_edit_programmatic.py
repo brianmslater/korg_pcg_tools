@@ -1,13 +1,20 @@
 #!/usr/bin/env python3
-"""Test script for programmatic editing (no GUI)."""
+"""Test script for programmatic editing (no GUI).
+
+This is a standalone script, not a pytest test.
+Run with: python test_edit_programmatic.py <pcg_file>
+"""
+
+import pytest
+import sys
 
 from pcg_tools.reader import read_pcg_file
 from pcg_tools.writer import write_pcg_file
 from pcg_tools.models import Category
-import sys
 
 
-def test_programmatic_edit(pcg_file):
+@pytest.mark.skip(reason="Standalone script - requires command line argument")
+def test_programmatic_edit(pcg_file=None):
     """Test programmatic editing of patches."""
     print(f"Loading PCG file: {pcg_file}")
     
@@ -167,4 +174,5 @@ if __name__ == "__main__":
         print("Usage: python test_edit_programmatic.py <pcg_file>")
         sys.exit(1)
     
-    test_programmatic_edit(sys.argv[1])
+    # Call without the skip decorator when run directly
+    test_programmatic_edit.__wrapped__(sys.argv[1]) if hasattr(test_programmatic_edit, '__wrapped__') else test_programmatic_edit(sys.argv[1])

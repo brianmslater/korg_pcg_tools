@@ -1,0 +1,4 @@
+# file: /Users/bmslater/Documents/projects/korg_pcg_tools/pcg_tools/volume_change.py
+# hypothesis_version: 6.141.1
+
+[0.5, 100.0, 127, 'Both', 'Int', 'On', 'fixed', 'mapped', 'percentage', 'relative', 'smart_mapped']

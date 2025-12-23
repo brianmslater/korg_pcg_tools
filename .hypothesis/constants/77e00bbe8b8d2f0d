@@ -1,0 +1,4 @@
+# file: /Users/bmslater/Documents/projects/korg_pcg_tools/pcg_tools/pcg_parser.py
+# hypothesis_version: 6.141.1
+
+[b'\x00', b'\x1e\x02\x00\x00', b'(\x0f\x01\x00', b'CBK1', b'CMB1', b'DBK1', b'DKT1', b'MBK1', b'PBK1', b'PCG1', b'PRG1', b'SBK1', b'SLD1', b'SLS1', b'STL1', b'WBK1', b'WSQ1', 100.0, 120.0, 111, 127, 128, 129, 136, 188, 256, 542, 1304, 1306, 2558, 2560, 2568, 2570, 4096, 4790, 4791, 4792, 4802, 7810, 8192, 32768, 65535, 100000, 131072, 196608, '- (EXi)', '- (Unused)', '<H', '<h', '>H', '>I', 'Both', 'CMB1 chunk not found', 'Combi', 'DKT1 chunk not found', 'Double', 'Double Drums', 'Drums', 'EXi', 'Ex2', 'Ext', 'GM', 'HD-1', 'I-A', 'I-F', 'INT', 'Int', 'Legato', 'Mono', 'Off', 'Osc1', 'Osc2', 'PRG1 chunk not found', 'Poly', 'Prg', 'Program', 'SLD1 chunk not found', 'SLS1 chunk not found', 'Single', 'Song', 'WSQ1 chunk not found', 'ascii', 'combi', 'g(d)', 'ignore', 'replace']

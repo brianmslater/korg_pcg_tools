@@ -1,16 +1,24 @@
 #!/usr/bin/env python3
 """Test setlist slot copy/paste functionality."""
 
+import pytest
+import os
+
+TEST_FILE = "files_2_test/nw.PCG"
+TEST_FILE_EXISTS = os.path.exists(TEST_FILE)
+
 from pcg_tools.reader import read_pcg_file
 from pcg_tools.writer import write_pcg_file
 from pcg_tools.clipboard import get_clipboard
+from pcg_tools.models import SetListSlot
 
+@pytest.mark.skipif(not TEST_FILE_EXISTS, reason=f"Test file {TEST_FILE} not found")
 def test_slot_copy_paste():
     """Test copying and pasting setlist slots."""
     
     # Read test file
     print("Reading test file...")
-    pcg = read_pcg_file("test_files/soundcheck_BASE_FOR_TESTING.PCG")
+    pcg = read_pcg_file(TEST_FILE)
     
     # Get first setlist
     setlist = pcg.set_lists[0]
@@ -50,7 +58,6 @@ def test_slot_copy_paste():
     
     if not dest_slot:
         # Create new slot
-        from pcg_tools.models import SetListSlot
         dest_slot = SetListSlot(
             set_list_index=setlist.index,
             slot_index=dest_index,
@@ -92,18 +99,7 @@ def test_slot_copy_paste():
     assert dest_slot.color == source_slot.color, "Color should match"
     
     print("\n✓ All properties match!")
-    
     print("\n✅ Copy/paste functionality works!")
-    print("\nNote: Slot names are stored in SLS1 chunk format.")
-    print("The writer currently preserves raw_data, so names should persist")
-    print("if the slot already existed. New slots may need writer updates.")
-    
-    # Save the modified file
-    output_file = "test_files/soundcheck_SLOT_COPY_PASTE_TEST.PCG"
-    write_pcg_file(pcg, output_file)
-    print(f"\n✓ Saved to {output_file}")
-    
-    print("\n✅ All tests passed!")
 
 if __name__ == "__main__":
     test_slot_copy_paste()

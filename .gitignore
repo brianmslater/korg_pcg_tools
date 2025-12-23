@@ -61,3 +61,4 @@ venv_tk/
 # PCG files (except examples)
 *.PCG
 !examples/**/*.PCG
+pcg-tools-csharp/

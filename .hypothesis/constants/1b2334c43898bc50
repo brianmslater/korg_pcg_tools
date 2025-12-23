@@ -1,0 +1,4 @@
+# file: /Users/bmslater/Documents/projects/korg_pcg_tools/pcg_tools/virtual_banks.py
+# hypothesis_version: 6.141.1
+
+['-', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'V']

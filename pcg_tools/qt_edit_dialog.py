@@ -318,6 +318,12 @@ class QtEditTimbreDialog(QDialog):
         self.transpose_spin.setValue(self.timbre.transpose)
         form.addRow("Transpose:", self.transpose_spin)
         
+        # Bend Range (offset +6, signed, typically -24 to +24)
+        self.bend_range_spin = QSpinBox()
+        self.bend_range_spin.setRange(-24, 24)
+        self.bend_range_spin.setValue(self.timbre.bend_range)
+        form.addRow("Bend Range:", self.bend_range_spin)
+        
         # Mute
         self.mute_check = QCheckBox("Mute this timbre")
         self.mute_check.setChecked(self.timbre.mute)
@@ -381,6 +387,7 @@ class QtEditTimbreDialog(QDialog):
         self.timbre.midi_channel = self.midi_ch_spin.value() - 1  # Convert back to 0-15
         self.timbre.volume = self.volume_spin.value()
         self.timbre.transpose = self.transpose_spin.value()
+        self.timbre.bend_range = self.bend_range_spin.value()
         self.timbre.mute = self.mute_check.isChecked()
         self.timbre.bottom_key = self.bottom_key_spin.value()
         self.timbre.top_key = self.top_key_spin.value()
@@ -420,6 +427,10 @@ class QtEditTimbreDialog(QDialog):
         
         # Volume (offset +5)
         raw_data[timbre_offset + 5] = self.timbre.volume
+        
+        # Bend Range (offset +6, signed)
+        bend_range_byte = self.timbre.bend_range if self.timbre.bend_range >= 0 else (256 + self.timbre.bend_range)
+        raw_data[timbre_offset + 6] = bend_range_byte
         
         # Transpose (offset +7, signed)
         transpose_byte = self.timbre.transpose if self.timbre.transpose >= 0 else (256 + self.timbre.transpose)

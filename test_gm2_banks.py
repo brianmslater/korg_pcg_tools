@@ -3,8 +3,12 @@
 
 These banks are ROM banks on the Kronos hardware and are not stored in PCG files.
 This script tests the GM2 bank parsing functionality.
+
+This is a standalone script, not a pytest test.
+Run with: python test_gm2_banks.py [pcg_file]
 """
 
+import pytest
 import sys
 from pathlib import Path
 
@@ -15,7 +19,8 @@ from pcg_tools.reader import read_pcg_file
 from pcg_tools.gm2_data import is_gm2_bank
 
 
-def test_gm2_banks_from_file(pcg_path: str):
+@pytest.mark.skip(reason="Standalone script - requires command line argument")
+def test_gm2_banks_from_file(pcg_path: str = None):
     """Test GM2 banks loaded from a PCG file.
     
     Args:

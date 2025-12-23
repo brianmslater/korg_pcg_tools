@@ -3,8 +3,8 @@
 
 def test_update_all_copies():
     """Update all 4 copies of NIGHTWISH LEGACY."""
-    input_file = 'test_files/soundcheck_BASE_FOR_TESTING.PCG'
-    output_file = 'test_files/soundcheck_ALL_COPIES_UPDATED.PCG'
+    input_file = 'files_2_test/nw.PCG'
+    output_file = 'files_2_test/soundcheck_ALL_COPIES_UPDATED.PCG'
     
     print("="*80)
     print("UPDATE ALL COPIES TEST")

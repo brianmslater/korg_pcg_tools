@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
-"""Test that GM and GM2 banks are marked as read-only."""
+"""Test that GM and GM2 banks are marked as read-only.
 
+This is a standalone script, not a pytest test.
+Run with: python test_gm_readonly.py <pcg_file>
+"""
+
+import pytest
 import sys
 from pathlib import Path
 
@@ -9,7 +14,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 from pcg_tools.reader import read_pcg_file
 
 
-def test_readonly_banks(pcg_path: str):
+@pytest.mark.skip(reason="Standalone script - requires command line argument")
+def test_readonly_banks(pcg_path: str = None):
     """Test that ROM banks are marked as read-only.
     
     Args:

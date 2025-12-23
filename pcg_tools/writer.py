@@ -77,12 +77,21 @@ class PcgWriter:
         
         raw_data = bytearray(self.pcg.raw_data)
         
-        # Update program names directly in raw_data
+        # Update program data directly in raw_data
         for bank in self.pcg.program_banks:
             for prog in bank.patches:
                 if hasattr(prog, '_raw_offset') and prog._raw_offset > 0:
-                    # Program name is at offset 0 in the program data (first 24 bytes)
                     offset = prog._raw_offset
+                    
+                    # If program has raw_data, write the entire program data
+                    # This handles copied programs that have full sound data
+                    if hasattr(prog, 'raw_data') and prog.raw_data and len(prog.raw_data) > 24:
+                        # Write the full program raw_data
+                        prog_size = len(prog.raw_data)
+                        if offset + prog_size <= len(raw_data):
+                            raw_data[offset:offset+prog_size] = prog.raw_data
+                    
+                    # Always update the name (first 24 bytes) to ensure it's current
                     name_bytes = prog.name.encode('ascii', errors='ignore')[:24]
                     name_bytes = name_bytes.ljust(24, b'\x00')
                     raw_data[offset:offset+24] = name_bytes
@@ -91,13 +100,20 @@ class PcgWriter:
         for bank in self.pcg.combi_banks:
             for combi in bank.patches:
                 if hasattr(combi, '_raw_offset') and combi._raw_offset > 0:
-                    # Combi name is at offset 0 in the combi data (first 24 bytes)
                     offset = combi._raw_offset
+                    
+                    # If combi has raw_data, write the entire combi data
+                    if hasattr(combi, 'raw_data') and combi.raw_data and len(combi.raw_data) > 24:
+                        combi_size = len(combi.raw_data)
+                        if offset + combi_size <= len(raw_data):
+                            raw_data[offset:offset+combi_size] = combi.raw_data
+                    
+                    # Always update the name (first 24 bytes) to ensure it's current
                     name_bytes = combi.name.encode('ascii', errors='ignore')[:24]
                     name_bytes = name_bytes.ljust(24, b'\x00')
                     raw_data[offset:offset+24] = name_bytes
                     
-                    # Update timbre data
+                    # Update timbre data (program references, volume, etc.)
                     self._update_timbre_data(raw_data, combi)
         
         # Update ALL chunks to keep them in sync
@@ -111,6 +127,8 @@ class PcgWriter:
         Timbre structure (from C# KronosTimbres.cs and Timbre.cs):
         - Timbre base offset: 4802 (from C# KronosTimbres.cs: TimbresOffsetConstant)
         - Timbre size: 188 bytes (from C# KronosTimbre.cs: TimbresSizeConstant)
+        - Offset +0: Program index (bits 7-0)
+        - Offset +1: Bank ID (PcgId)
         - Offset +2: Status (bits 7-5) and MIDI channel (bits 4-0)
         - Offset +5: Volume (bits 7-0)
         - Offset +7: Transpose (bits 7-0, signed)
@@ -138,6 +156,13 @@ class PcgWriter:
             # Verify we're in bounds
             if timbre_offset + 42 > len(raw_data):
                 break
+            
+            # Update program index (offset +0)
+            raw_data[timbre_offset + 0] = timbre.program_index & 0xFF
+            
+            # Update bank ID (offset +1) - convert bank name to PcgId
+            bank_pcg_id = self._bank_name_to_pcg_id(timbre.program_bank)
+            raw_data[timbre_offset + 1] = bank_pcg_id & 0xFF
             
             # Update Status (offset +2, bits 7-5) and MIDI channel (offset +2, bits 4-0)
             status_value = ["Off", "Int", "Both", "Ext", "Ex2"].index(timbre.status) if timbre.status in ["Off", "Int", "Both", "Ext", "Ex2"] else 1
@@ -169,6 +194,76 @@ class PcgWriter:
             raw_data[timbre_offset + 40] = timbre.top_velocity & 0xFF
             raw_data[timbre_offset + 41] = timbre.bottom_velocity & 0xFF
     
+    def _bank_name_to_pcg_id(self, bank_name: str) -> int:
+        """Convert bank name (I-A, U-B, etc.) to PcgId byte value.
+        
+        Based on C# KronosProgramBanks.cs bank ID mapping:
+        - I-A through I-F: 0-5
+        - GM: 6
+        - g(1) through g(9): 7-15 (GM2 sub-banks)
+        - g(d): 16 (GM2 drums)
+        - U-A through U-G: 17-23
+        - U-AA through U-GG: 24-30
+        - Virtual banks V0-A through V7-H: 48-111 (0x30+)
+        """
+        if not bank_name:
+            return 0  # Default to I-A
+        
+        # Handle INT- prefix (display format)
+        if bank_name.startswith("INT-"):
+            bank_name = "I-" + bank_name[4:]
+        elif bank_name.startswith("USER-"):
+            bank_name = "U-" + bank_name[5:]
+        
+        # Internal banks I-A through I-F
+        if bank_name.startswith("I-") and len(bank_name) == 3:
+            letter = bank_name[2].upper()
+            if 'A' <= letter <= 'F':
+                return ord(letter) - ord('A')  # 0-5
+        
+        # GM bank
+        if bank_name == "GM":
+            return 6
+        
+        # GM2 sub-banks g(1) through g(9)
+        if bank_name.startswith("g(") and bank_name.endswith(")"):
+            inner = bank_name[2:-1]
+            if inner == "d":
+                return 16  # g(d) = drums
+            elif inner.isdigit():
+                return 6 + int(inner)  # g(1)=7, g(2)=8, ..., g(9)=15
+        
+        # User banks U-A through U-G
+        if bank_name.startswith("U-") and len(bank_name) == 3:
+            letter = bank_name[2].upper()
+            if 'A' <= letter <= 'G':
+                return 17 + (ord(letter) - ord('A'))  # 17-23
+        
+        # Extended user banks U-AA through U-GG
+        if bank_name.startswith("U-") and len(bank_name) == 4:
+            letter = bank_name[2].upper()
+            if 'A' <= letter <= 'G':
+                return 24 + (ord(letter) - ord('A'))  # 24-30
+        
+        # Virtual banks V0-A through V7-H
+        if bank_name.startswith("V") and "-" in bank_name:
+            parts = bank_name[1:].split("-")
+            if len(parts) == 2 and parts[0].isdigit():
+                group = int(parts[0])
+                letter = parts[1].upper()
+                if 0 <= group <= 7 and 'A' <= letter <= 'H':
+                    return 48 + (group * 8) + (ord(letter) - ord('A'))
+        
+        # Handle unknown bank format ?-N (preserve original value)
+        if bank_name.startswith("?-"):
+            try:
+                return int(bank_name[2:])
+            except ValueError:
+                pass
+        
+        # Default to I-A if unknown
+        return 0
+    
     def _update_all_setlist_chunks(self, raw_data: bytearray):
         """Update setlist names in both SLS1 and STL1 chunks.
         
@@ -191,16 +286,19 @@ class PcgWriter:
     def _update_sls1_names(self, raw_data: bytearray):
         """Update setlist names in SLS1 chunk (new format).
         
-        Structure: marker (1e020000) + name (24 bytes) + separator (280f0100)
-        Spacing: ~3612 bytes between setlists
+        CRITICAL: The first setlist (e.g., "Preload Set List") has NO marker before it,
+        while all subsequent setlists have a marker (0x1E 0x02 0x00 0x00).
         
-        This is the format the parser reads from, so it MUST be updated!
+        Structure:
+        - First setlist: name (24 bytes) + separator (280f0100) - NO marker
+        - Other setlists: marker (1e020000) + name (24 bytes) + separator (280f0100)
+        
+        This must match how the parser reads setlists in _parse_new_setlist_format().
         """
         sls1_offset = raw_data.find(b'SLS1')
         if sls1_offset < 0:
             return
         
-        # Find setlist positions by looking for the marker pattern
         marker = b'\x1e\x02\x00\x00'
         separator = b'\x28\x0f\x01\x00'
         
@@ -208,30 +306,42 @@ class PcgWriter:
         sls1_size = struct.unpack('<I', raw_data[sls1_offset+4:sls1_offset+8])[0]
         sls1_end = sls1_data_start + sls1_size
         
-        # Find all setlist name positions
-        positions = []
+        # Find setlist positions using the SAME logic as the parser
+        # This ensures we write to the same positions we read from
+        setlist_positions = []  # List of (name_offset, has_marker)
+        first_setlist_offset = None
+        
         pos = sls1_data_start
         while pos < sls1_end:
-            # Look for marker
-            pos = raw_data.find(marker, pos, sls1_end)
-            if pos == -1:
+            pos = raw_data.find(separator, pos)
+            if pos == -1 or pos >= sls1_end:
                 break
             
-            # Check if separator follows after 24 bytes
-            name_start = pos + 4
-            sep_pos = name_start + 24
-            if sep_pos + 4 <= sls1_end:
-                if raw_data[sep_pos:sep_pos+4] == separator:
-                    positions.append(name_start)
+            # Check if there's a setlist name before this separator
+            name_offset = pos - 24
+            if name_offset >= sls1_offset:
+                marker_offset = name_offset - 4
+                if marker_offset >= sls1_offset:
+                    check_marker = raw_data[marker_offset:marker_offset+4]
+                    if check_marker == marker:
+                        # Standard setlist with marker
+                        setlist_positions.append((name_offset, True))
+                    elif first_setlist_offset is None:
+                        # First setlist without marker
+                        first_setlist_offset = name_offset
             
-            pos += 1
+            pos += 4
+        
+        # Insert first setlist at beginning (same as parser)
+        if first_setlist_offset is not None:
+            setlist_positions.insert(0, (first_setlist_offset, False))
         
         # Update names for setlists we have
         for sl_idx, setlist in enumerate(self.pcg.set_lists):
-            if sl_idx >= len(positions):
+            if sl_idx >= len(setlist_positions):
                 break
             
-            name_pos = positions[sl_idx]
+            name_pos, has_marker = setlist_positions[sl_idx]
             name_bytes = setlist.name.encode('ascii', errors='ignore')[:24]
             name_bytes = name_bytes.ljust(24, b'\x00')
             raw_data[name_pos:name_pos+24] = name_bytes
@@ -373,11 +483,9 @@ class PcgWriter:
         """Update STL1/SBK1 chunk with setlist data.
         
         SBK1 structure (discovered through analysis):
-        - Each setlist is 69,416 bytes
-        - Setlist N starts at: SBK1_data_start + (N * 69416) + 69432
-        - Within each setlist:
-          - Offset +0: Setlist name (24 bytes) - but actually at -16 from first occurrence
-          - Slots follow after
+        - First setlist name at: SBK1_data_start + 16
+        - Subsequent setlists at: SBK1_data_start + 16 + (N * 69416)
+        - Each setlist is 69,416 bytes apart
         
         This is the chunk the Kronos actually reads for display!
         """
@@ -394,22 +502,20 @@ class PcgWriter:
         if sbk1_offset < 0:
             return
         
-        # SBK1 data starts at +8
+        # SBK1 data starts at +8 (after chunk ID and size)
+        # But there's also a 4-byte field before the actual data
         sbk1_data_start = sbk1_offset + 8
         
-        # Constants from analysis
-        SETLIST_SPACING = 69416  # Bytes between setlists
-        FIRST_SETLIST_OFFSET = 69432  # Offset to first setlist name
-        NAME_OFFSET_FROM_FOUND = -16  # Setlist name is 16 bytes before where we find it
+        # Constants from analysis:
+        # - First setlist "Preload Set List" is at offset 16 from SBK1 data start
+        # - Subsequent setlists are 69416 bytes apart
+        FIRST_SETLIST_OFFSET = 16  # First setlist name offset
+        SETLIST_SPACING = 69416    # Bytes between setlists
         
         # Update each setlist we have data for
         for sl_idx, setlist in enumerate(self.pcg.set_lists):
             # Calculate where this setlist's name should be
-            # First setlist is at +69432, then every 69416 bytes
-            if sl_idx == 0:
-                name_pos = sbk1_data_start + FIRST_SETLIST_OFFSET
-            else:
-                name_pos = sbk1_data_start + FIRST_SETLIST_OFFSET + (sl_idx * SETLIST_SPACING)
+            name_pos = sbk1_data_start + FIRST_SETLIST_OFFSET + (sl_idx * SETLIST_SPACING)
             
             # Verify we're in bounds
             if name_pos + 24 > len(raw_data):

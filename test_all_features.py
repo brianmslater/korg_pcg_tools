@@ -7,6 +7,14 @@ Tests all major features added in this release.
 import sys
 import traceback
 from pathlib import Path
+import pytest
+import os
+
+# Test file path - use available test file
+TEST_FILE = "files_2_test/nw.PCG"
+
+# Check if test file exists
+TEST_FILE_EXISTS = os.path.exists(TEST_FILE)
 
 # Test results tracking
 tests_passed = 0
@@ -45,6 +53,7 @@ def test_imports():
     
     print("✓ All imports successful")
 
+@pytest.mark.skipif(not TEST_FILE_EXISTS, reason=f"Test file {TEST_FILE} not found")
 def test_file_operations():
     """Test basic file read/write operations."""
     print("Testing file operations...")
@@ -53,7 +62,7 @@ def test_file_operations():
     from pcg_tools.writer import write_pcg_file
     
     # Read test file
-    pcg = read_pcg_file("test_files/soundcheck_BASE_FOR_TESTING.PCG")
+    pcg = read_pcg_file(TEST_FILE)
     assert pcg is not None, "Failed to read PCG file"
     assert len(pcg.program_banks) > 0, "No program banks found"
     assert len(pcg.combi_banks) > 0, "No combi banks found"
@@ -63,7 +72,7 @@ def test_file_operations():
           f"{len(pcg.combi_banks)} combi banks, {len(pcg.set_lists)} setlists")
     
     # Write test file
-    output_file = "test_files/test_all_features_output.PCG"
+    output_file = "files_2_test/test_all_features_output.PCG"
     write_pcg_file(pcg, output_file)
     
     # Verify written file
@@ -72,6 +81,7 @@ def test_file_operations():
     
     print(f"✓ Write/read cycle successful")
 
+@pytest.mark.skipif(not TEST_FILE_EXISTS, reason=f"Test file {TEST_FILE} not found")
 def test_program_copy_paste():
     """Test program copy/paste functionality."""
     print("Testing program copy/paste...")
@@ -79,7 +89,7 @@ def test_program_copy_paste():
     from pcg_tools.reader import read_pcg_file
     from pcg_tools.clipboard import get_clipboard
     
-    pcg = read_pcg_file("test_files/soundcheck_BASE_FOR_TESTING.PCG")
+    pcg = read_pcg_file(TEST_FILE)
     bank = pcg.program_banks[0]
     
     clipboard = get_clipboard()
@@ -97,6 +107,7 @@ def test_program_copy_paste():
     assert target.name == source.name, "Program name should match after paste"
     print(f"✓ Copied '{source.name}' to slot 10")
 
+@pytest.mark.skipif(not TEST_FILE_EXISTS, reason=f"Test file {TEST_FILE} not found")
 def test_slot_copy_paste():
     """Test setlist slot copy/paste functionality."""
     print("Testing slot copy/paste...")
@@ -104,7 +115,7 @@ def test_slot_copy_paste():
     from pcg_tools.reader import read_pcg_file
     from pcg_tools.clipboard import get_clipboard
     
-    pcg = read_pcg_file("test_files/soundcheck_BASE_FOR_TESTING.PCG")
+    pcg = read_pcg_file(TEST_FILE)
     setlist = pcg.set_lists[0]
     
     clipboard = get_clipboard()
@@ -126,6 +137,7 @@ def test_slot_copy_paste():
     else:
         print("✓ No slots to test (skipped)")
 
+@pytest.mark.skipif(not TEST_FILE_EXISTS, reason=f"Test file {TEST_FILE} not found")
 def test_batch_operations():
     """Test batch operations."""
     print("Testing batch operations...")
@@ -133,7 +145,7 @@ def test_batch_operations():
     from pcg_tools.reader import read_pcg_file
     from pcg_tools.batch_operations import BatchOperations
     
-    pcg = read_pcg_file("test_files/soundcheck_BASE_FOR_TESTING.PCG")
+    pcg = read_pcg_file(TEST_FILE)
     bank = pcg.program_banks[0]
     
     original_count = len(bank.patches)
@@ -158,6 +170,7 @@ def test_batch_operations():
     BatchOperations.remove_duplicates(bank, by="name")
     print(f"✓ Removed duplicates")
 
+@pytest.mark.skipif(not TEST_FILE_EXISTS, reason=f"Test file {TEST_FILE} not found")
 def test_move_operations():
     """Test move up/down operations."""
     print("Testing move operations...")
@@ -165,7 +178,7 @@ def test_move_operations():
     from pcg_tools.reader import read_pcg_file
     from pcg_tools.batch_operations import BatchOperations
     
-    pcg = read_pcg_file("test_files/soundcheck_BASE_FOR_TESTING.PCG")
+    pcg = read_pcg_file(TEST_FILE)
     bank = pcg.program_banks[0]
     
     # Test move down
@@ -181,6 +194,7 @@ def test_move_operations():
     assert bank.patches[0].name == first_name, "Patch should have moved back up"
     print(f"✓ Moved patch up")
 
+@pytest.mark.skipif(not TEST_FILE_EXISTS, reason=f"Test file {TEST_FILE} not found")
 def test_file_safety():
     """Test file safety features."""
     print("Testing file safety features...")
@@ -189,10 +203,10 @@ def test_file_safety():
     from pcg_tools.writer import write_pcg_file
     import os
     
-    pcg = read_pcg_file("test_files/soundcheck_BASE_FOR_TESTING.PCG")
+    pcg = read_pcg_file(TEST_FILE)
     
     # Test auto-backup
-    test_file = "test_files/test_safety.PCG"
+    test_file = "files_2_test/test_safety.PCG"
     backup_file = test_file + ".backup"
     
     # Create initial file
@@ -212,13 +226,14 @@ def test_file_safety():
     if os.path.exists(backup_file):
         os.remove(backup_file)
 
+@pytest.mark.skipif(not TEST_FILE_EXISTS, reason=f"Test file {TEST_FILE} not found")
 def test_cli_commands():
     """Test CLI commands."""
     print("Testing CLI commands...")
     
     import subprocess
     
-    test_file = "test_files/soundcheck_BASE_FOR_TESTING.PCG"
+    test_file = TEST_FILE
     
     # Test info command
     result = subprocess.run(

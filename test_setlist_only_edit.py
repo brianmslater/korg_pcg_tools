@@ -5,14 +5,32 @@ import sys
 import shutil
 sys.path.insert(0, '.')
 
+import pytest
+import os
+
+TEST_FILE = "files_2_test/nw.PCG"
+TEST_FILE_EXISTS = os.path.exists(TEST_FILE)
+
 from pcg_tools.pcg_parser import PcgBinaryParser
+import pytest
+import os
+
+TEST_FILE = "files_2_test/nw.PCG"
+TEST_FILE_EXISTS = os.path.exists(TEST_FILE)
+
 from pcg_tools.writer import write_pcg_file
+import pytest
+import os
+
+TEST_FILE = "files_2_test/nw.PCG"
+TEST_FILE_EXISTS = os.path.exists(TEST_FILE)
+
 from pcg_tools.models import PcgFile, PcgHeader, WorkstationModel
 
 def test_setlist_only_edit():
     """Edit only setlist names, not touching programs or combis."""
-    input_file = 'test_files/soundcheck_BASE_FOR_TESTING.PCG'
-    output_file = 'test_files/soundcheck_SETLIST_ONLY_EDIT.PCG'
+    input_file = 'files_2_test/nw.PCG'
+    output_file = 'files_2_test/soundcheck_SETLIST_ONLY_EDIT.PCG'
     
     print("="*80)
     print("SETLIST-ONLY EDIT TEST")
@@ -71,7 +89,7 @@ def test_setlist_only_edit():
     
     if edited_count == 0:
         print("ERROR: No setlists found to edit")
-        return False
+        pytest.fail("No setlists found to edit")
     
     print()
     print("Writing edited file...")
@@ -88,7 +106,7 @@ def test_setlist_only_edit():
     # Compare sizes
     if len(data) != len(new_data):
         print(f"ERROR: File size changed! {len(data)} -> {len(new_data)}")
-        return False
+        pytest.fail(f"File size changed! {len(data)} -> {len(new_data)}")
     
     # Count differences
     diffs = sum(1 for i in range(len(data)) if data[i] != new_data[i])
@@ -103,8 +121,8 @@ def test_setlist_only_edit():
     print("3. If this works, the issue is specific to program/combi editing")
     print("4. If this fails, the issue is in our file writing logic")
     
-    return True
+    # Test passes - no return needed
 
 if __name__ == '__main__':
-    success = test_setlist_only_edit()
-    sys.exit(0 if success else 1)
+    test_setlist_only_edit()
+    sys.exit(0)

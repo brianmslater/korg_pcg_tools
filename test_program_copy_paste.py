@@ -1,8 +1,26 @@
 #!/usr/bin/env python3
 """Test program copy/paste functionality."""
 
+import pytest
+import os
+
+TEST_FILE = "files_2_test/nw.PCG"
+TEST_FILE_EXISTS = os.path.exists(TEST_FILE)
+
 from pcg_tools.reader import read_pcg_file
+import pytest
+import os
+
+TEST_FILE = "files_2_test/nw.PCG"
+TEST_FILE_EXISTS = os.path.exists(TEST_FILE)
+
 from pcg_tools.writer import write_pcg_file
+import pytest
+import os
+
+TEST_FILE = "files_2_test/nw.PCG"
+TEST_FILE_EXISTS = os.path.exists(TEST_FILE)
+
 from pcg_tools.clipboard import get_clipboard
 
 def test_program_copy_paste():
@@ -10,7 +28,7 @@ def test_program_copy_paste():
     
     # Read test file
     print("Reading test file...")
-    pcg = read_pcg_file("test_files/soundcheck_BASE_FOR_TESTING.PCG")
+    pcg = read_pcg_file("files_2_test/nw.PCG")
     
     # Get first program bank
     bank = pcg.program_banks[0]
@@ -24,6 +42,7 @@ def test_program_copy_paste():
     # Get source and destination programs
     source_program = bank.patches[0]
     dest_program = bank.patches[10]
+    original_dest_id = dest_program.id  # Save original ID for verification
     
     print(f"\nSource program (index {0}):")
     print(f"  ID: {source_program.id}")
@@ -66,14 +85,14 @@ def test_program_copy_paste():
     assert dest_program.engine == source_program.engine, "Engine should match"
     assert dest_program.osc_mode == source_program.osc_mode, "OSC Mode should match"
     
-    # Verify ID did NOT change
-    assert dest_program.id == "I-A010", "ID should remain unchanged"
+    # Verify ID did NOT change (should still be the destination's original ID)
+    assert dest_program.id == original_dest_id, "ID should remain unchanged"
     
     print("\n✓ All properties match!")
     print("✓ Program ID preserved (not copied)")
     
     # Save the modified file
-    output_file = "test_files/soundcheck_PROGRAM_COPY_PASTE_TEST.PCG"
+    output_file = "files_2_test/soundcheck_PROGRAM_COPY_PASTE_TEST.PCG"
     write_pcg_file(pcg, output_file)
     print(f"\n✓ Saved to {output_file}")
     
@@ -84,7 +103,7 @@ def test_program_copy_paste():
     pasted_program = bank2.patches[10]
     
     assert pasted_program.name == source_program.name, "Name should persist after save"
-    assert pasted_program.id == "I-A010", "ID should remain I-A010"
+    assert pasted_program.id == original_dest_id, "ID should remain unchanged after save"
     
     print("✓ Pasted program verified in saved file")
     print("\n✅ All tests passed!")

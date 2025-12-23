@@ -1,182 +1,113 @@
 # Known Issues and Limitations
 
-## ✅ Fixed Issues
+## Current Status: ✅ All Major Features Working
+
+As of v1.4.x (December 2025), all major editing features are working and hardware-tested on Korg Kronos.
+
+---
+
+## ✅ Fixed Issues (Historical)
 
 ### Program/Combi Editing Corrupts Files (FIXED in v1.2.1)
-**Status:** ✅ FIXED - Nov 27, 2025  
-**Was:** Critical bug blocking all editing  
-**Fixed:** Implemented checksum calculation
+**Status:** ✅ FIXED - Nov 27, 2025
 
-**Root Cause:**
-PCG files use checksums stored at byte 11 of each chunk header. The Kronos validates these checksums and rejects files with incorrect values.
+**Root Cause:** PCG files use checksums stored at byte 11 of each chunk header. The Kronos validates these checksums and rejects files with incorrect values.
 
-**Solution:**
-- Created `pcg_tools/checksum.py` with proper checksum calculation
-- Checksums automatically fixed before writing
-- Handles nested chunk structure (SLS1 → STL1 → SBK1)
-- Updates both SLS1 and STL1 for setlist changes
-
-**Hardware Tested and Verified:**
-- ✅ Setlist name editing works
-- ✅ Program name editing works
-- ✅ Combi name editing works
-- ✅ All changes appear correctly on Kronos hardware
-- ✅ Files load without errors
-
----
-
-## 🚨 Critical Issues
-
-None currently! All editing features are working.
-
----
-
-## ✅ Previously Fixed Issues
+**Solution:** Created `pcg_tools/checksum.py` with proper checksum calculation. Checksums automatically fixed before writing.
 
 ### Program/Combi Editing Crash on macOS (FIXED in v1.2.1)
-**Status:** ✅ FIXED  
-**Was:** Crash issue in v1.2.0  
-**Fixed:** v1.2.1 with native Qt dialog
+**Status:** ✅ FIXED
 
-**Original Problem:**
-The edit dialog used Tkinter, which conflicted with PySide6 (Qt) on macOS, causing crashes.
+**Root Cause:** The edit dialog used Tkinter, which conflicted with PySide6 (Qt) on macOS.
 
-**Solution:**
-Replaced Tkinter dialog with native Qt dialog (`qt_edit_dialog.py`). However, editing is now disabled due to file corruption issue above.
+**Solution:** Replaced Tkinter dialog with native Qt dialog (`qt_edit_dialog.py`).
 
 ---
 
-## v1.1.0 - What Works and What Doesn't
+## ⚠️ Known Limitations
 
-### ✅ What Works (Hardware Tested)
+### Legacy Synthesizer Support
+The following models are NOT supported in the Python version:
+- Korg microStation
+- Korg microKORG / microKORG XL (.syx files)
+- Korg MS2000 (.syx files)
+- Korg M1/M1R (.syx files)
+- Korg 01/W (.syx files)
+- Korg T1/T2/T3 (.syx files)
+- Korg Z1 (.syx files)
+- Korg Wavestation (.syx files)
 
-**Setlist Name Editing:**
-- ✅ Edit all 16 setlist names
-- ✅ Changes save correctly to PCG files
-- ✅ Files load on Kronos hardware
-- ✅ Names display correctly on hardware
-- ✅ Hardware tested and confirmed working
+**Reason:** These models use SysEx (.syx) file format which requires different parsing logic. The C# version supports these, but they are low priority for the Python port.
 
-**CLI Tools (All Working):**
-- ✅ `info` - Display file information
-- ✅ `export` - Export patches to CSV/TXT
-- ✅ `list-patches` - List all programs/combis
-- ✅ `program-usage` - Show reference counts and where programs are used
-- ✅ `combi-content` - Show which programs each combi uses
-- ✅ `differences` - Compare two PCG files
+### Multi-Language Support
+The Python version only supports English. The C# version has 15+ language translations.
 
-**File Support:**
-- ✅ Read PCG files from all Korg models
-- ✅ Parse programs, combis, setlists
-- ✅ Cross-platform (Windows, macOS, Linux)
+**Reason:** Low priority - focus was on feature parity first.
 
-### ❌ What Doesn't Work Yet
+### Drum Pattern Parsing
+Drum pattern parsing is not implemented for Kronos.
 
-**Slot Notes/Comments:**
-- ❌ Slot notes are not displayed in the GUI
-- **Why**: Notes are stored in a complex structure within the SLS1 chunk that hasn't been fully parsed yet
-- **Details**: Notes appear after the slot name with metadata bytes in between
-- **Status**: Parsing implementation needed - the data exists in the file but requires additional parser work
-- **Workaround**: View/edit notes on Kronos hardware or use C# PCG Tools
+**Reason:** The C# source code throws `NotImplementedException` for Kronos drum patterns (DPI1 chunks). This feature was never completed in the original C# version.
 
-**Slot Property Editing:**
-- ✅ Slot colors now display correctly (v1.2.1+)
-- ✅ Slot text size parsed correctly (v1.2.1+)
-- ❌ Editing of transpose, volume not yet implemented
-- **Note**: Color and text size are read-only in current version
+### Kronos OS 1.5/1.6 Extended Bank Support
+Files created with Kronos OS 1.5/1.6 that use extended user banks (U-AA to U-GG) in setlist slots or combi timbres may not correctly resolve patch references.
 
-**Program/Combi Editing:**
-- ❌ No GUI for editing program/combi names
-- ❌ No editing of categories, favorites
-- ❌ No editing of program parameters
-- ❌ No editing of combi timbres
-- **Status**: Planned for v1.2.0
+**Technical Details:** OS 1.5/1.6 uses separate STL2/CBK2/PBK2 chunks to store extended bank references. The Python version only reads from the default offsets.
 
-**Advanced Features:**
-- ❌ Drum kits not parsed
-- ❌ Wave sequences not parsed
-- ❌ Copy/paste operations
-- ❌ Batch operations (sort, compact, remove duplicates)
-- ❌ Multiple windows
-- **Status**: Planned for future versions
+**Impact:** 
+- Setlist slots referencing programs in U-AA to U-GG banks may show wrong patch
+- Combi timbres referencing programs in U-AA to U-GG banks may show wrong patch
 
-### ⚠️ Important Notes
+**Workaround:** Most users are on OS 2.x or 3.x where this isn't an issue. If you have OS 1.5/1.6 files, use the original C# PCG Tools.
 
-**SLS1/SLD1 Format Limitations:**
+**Reason:** OS 1.5/1.6 is a legacy version. Most Kronos users have upgraded to OS 2.x or 3.x.
 
-The internal 16-setlist format (SLS1/SLD1) used by Kronos only stores:
-- ✅ Setlist names (24 characters)
-- ✅ Slot names (combi names, 24 characters)
+---
 
-It does NOT store:
-- ❌ Slot colors
-- ❌ Text sizes
-- ❌ Transpose settings
-- ❌ Volume settings
-- ❌ Notes/descriptions
+## 🔧 Technical Notes
 
-These are performance settings stored on the Kronos hardware itself, not in the PCG file.
+### PCG File Structure
+- Programs: name, id, bank, engine type, favorite, category, sub-category
+- Combis: name, id, bank, favorite, category, sub-category, 16 timbres
+- Timbres: All 16+ parameters including volume, transpose, key zones, velocity zones
+- Setlists: 16 setlists × 128 slots each with full property support
+- Drum kits: Parsed and displayed
+- Wave sequences: Parsed and displayed
 
-**STL1 Format (Single Setlist Export):**
+### Checksum Handling
+- Checksums automatically calculated and updated on save
+- Handles nested chunk structure (SLS1 → STL1 → SBK1)
+- INI2/INI3 checksums supported for Kronos OS 1.5+
 
-The single setlist export format (STL1) DOES include:
-- ✅ Colors
-- ✅ Text sizes
-- ✅ Transpose
-- ✅ Volume
-- ✅ Patch references
+### Hardware Testing
+All editing features have been tested on actual Korg Kronos 2 hardware:
+- ✅ Program name editing
+- ✅ Combi name editing
+- ✅ Setlist name editing
+- ✅ Slot property editing (name, color, text size, transpose, volume, description)
+- ✅ Timbre parameter editing
+- ✅ Copy/paste operations
+- ✅ Batch operations (sort, compact, remove duplicates)
 
-Support for STL1 format editing is planned for a future version.
+---
 
-### 🔧 Technical Details
+## 💡 Recommendations
 
-**Writer Implementation:**
-- Updates ONLY the SLS1 chunk (new format)
-- Does NOT modify SBK1 chunk (old format)
-- Kronos accepts files with mismatched SLS1/SBK1 names
-- Changing SBK1 breaks hidden file validation
+### For All Editing Tasks
+✅ Use the Python version - it's fully functional and hardware-tested!
 
-**What's Parsed:**
-- Programs: name, id, bank, engine, favorite
-- Combis: name, id, bank, favorite, timbres (basic)
-- Timbres: midi_channel, mute, pan, volume, status, program reference
-- Setlists: name, slots with names
+### For Legacy Synthesizers (.syx files)
+⚠️ Use the original C# PCG Tools for microKORG, MS2000, M1, etc.
 
-**What's NOT Parsed:**
-- Full program parameters (oscillators, filters, effects, etc.)
-- Full combi parameters
-- Full timbre parameters (key zones, velocity zones, transpose, detune, etc.)
-- Drum kits
-- Wave sequences
+### For Non-English Users
+⚠️ The Python version is English-only. Use C# version if you need other languages.
 
-### 📋 Roadmap
+---
 
-**v1.2.0 (Future):**
-- Program/Combi name editing
-- Category/favorite editing
-- Full parameter parsing
+## Version History
 
-**v1.3.0 (Future):**
-- STL1 format support (with slot properties)
-- Copy/paste operations
-- Batch operations
-
-**v2.0.0 (Future):**
-- Full program/combi parameter editing
-- Drum kit support
-- Wave sequence support
-
-### 💡 Recommendations
-
-**For Setlist Name Editing:**
-- ✅ Use Simple Setlist Editor - works perfectly!
-
-**For Slot Property Editing:**
-- ⚠️ Edit directly on Kronos hardware (not stored in PCG file)
-
-**For Program/Combi Editing:**
-- ⚠️ Use original C# PCG Tools for now
-- ✅ Python version coming in v1.2.0
-
-**For Reports and Analysis:**
-- ✅ Use CLI tools - all working great!
+- **v1.4.x** - Feature parity achieved, all major features working
+- **v1.3.0** - SNG file support, advanced features
+- **v1.2.x** - Program/combi editing, copy/paste, batch operations
+- **v1.1.0** - Setlist editing, CLI tools
+- **v1.0.0** - Initial release, read-only support

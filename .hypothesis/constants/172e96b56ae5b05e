@@ -1,0 +1,4 @@
+# file: /Users/bmslater/Documents/projects/korg_pcg_tools/pcg_tools/reader.py
+# hypothesis_version: 6.141.1
+
+[b'\x00', b'KORG', 104, 106, 117, 118, 124, 128, 'Drums', 'GM2', 'Program', 'Single', 'ascii', 'g(d)', 'ignore', 'rb']

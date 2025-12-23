@@ -1,0 +1,4 @@
+# file: /Users/bmslater/Documents/projects/korg_pcg_tools/pcg_tools/settings.py
+# hypothesis_version: 6.141.1
+
+[500, '-', '.pcg_tools', 'auto_backup_enabled', 'auto_extend_paste', 'auto_save', 'confirm_clear', 'confirm_delete', 'default_manual_path', 'max_recent_files', 'r', 'recent_files', 'selected_theme', 'settings.json', 'settings_tab_index', 'sort_order', 'sort_split_character', 'w']

@@ -1,164 +1,436 @@
-# Hardware Testing Guide for Kronos PCG Files
+# Hardware Testing Checklist - PCG Tools v1.4.x
 
-## Testing Workflow
-
-When testing PCG files on the Kronos hardware, follow this workflow:
-
-### 1. Generate Test File
-Run the appropriate test script to generate a modified PCG file:
-```bash
-python3 test_combi_timbre_direct.py
-```
-
-### 2. Copy to KEYBOARD Volume
-All test PCG files must be copied to the `/Volumes/KEYBOARD/` mount point when the SD card/USB drive is connected:
-```bash
-# First, check if KEYBOARD volume is mounted
-ls /Volumes/
-
-# If KEYBOARD is mounted, copy the file
-cp test_files/soundcheck_TIMBRE8_EDITED.PCG /Volumes/KEYBOARD/
-
-# If KEYBOARD is not mounted, insert the SD card/USB drive first
-```
-
-**Important**: The KEYBOARD volume is the SD card or USB drive that the Kronos reads from. Always copy test files here before hardware testing.
-
-**Current Status**: Test file is ready at `test_files/soundcheck_TIMBRE8_EDITED.PCG` - copy to KEYBOARD volume when SD card is inserted.
-
-### 3. Load on Kronos
-1. On the Kronos, go to the DISK mode
-2. Navigate to the file on the SD card/USB drive
-3. Load the PCG file
-4. Navigate to the specific patch to verify changes
-
-### 4. Verify Changes
-Check that the modifications are correctly applied:
-- For combi timbre edits: Check the timbre parameters in the combi
-- For setlist edits: Check the setlist names and slot names
-- For program edits: Check the program parameters
-
-## Current Test Files
-
-### soundcheck_TIMBRE8_EDITED.PCG
-**Purpose**: Test single timbre parameter editing with correct offsets
-
-**What to verify**:
-- Load the file on Kronos
-- Navigate to Combi I-A001 "Stradivarius Goes POP"
-- Check Timbre 8 parameters:
-  - Volume: Should be 127 (was 87) ✓
-  - MIDI Channel: Should be 16 (was 4) - Note: file value 15 displays as 16 ✓
-  - Transpose: Should be +24 (was 0) ✓
-
-**Test Result**: ✓ PASSED - All values verified correct on hardware!
-
-**Test script**: `test_combi_timbre_direct.py`
+**Test Date**: December 22, 2025  
+**Tester**: _______________  
+**Kronos Model**: _______________  
+**Kronos OS Version**: _______________
 
 ---
 
-### soundcheck_ALL_TIMBRES.PCG
-**Purpose**: Test editing all 16 timbres in a combi simultaneously
+## Quick Test List
 
-**What to verify**:
-- Load the file on Kronos
-- Navigate to Combi I-A001 "Stradivarius Goes POP"
-- Check ALL 16 timbres:
-  - Volume: Should be 10 (all timbres) ✓
-  - MIDI Channel: Should be 6 (all timbres) ✓
-  - Transpose: Should increment - Timbre 1=+1, Timbre 2=+2, ... Timbre 16=+16 ✓
+Copy this checklist to track progress:
 
-**Test Result**: ✓ PASSED - All 16 timbres verified correct on hardware!
+```
+HARDWARE TESTING - December 2025
 
-**Test script**: `test_all_timbres.py`
+Pre-Test:
+- [ ] Kronos powered on
+- [ ] USB/SD card ready
+- [ ] PCG Tools GUI running
+- [ ] Test PCG file created and copied to USB/SD
+
+Tests:
+- [ ] 1. Round-Trip (load/save without corruption)
+- [ ] 2. Program Name Edit
+- [ ] 3. Program Category/Favorite
+- [ ] 4. Combi Name Edit
+- [ ] 5. Timbre Volume
+- [ ] 6. Timbre MIDI Channel
+- [ ] 7. Timbre Transpose
+- [ ] 8. Timbre Key Zone
+- [ ] 9. Setlist Name Edit
+- [ ] 10. Slot Name Edit
+- [ ] 11. Slot Color
+- [ ] 12. Slot Volume
+- [ ] 13. Slot Transpose
+- [ ] 14. Slot Description
+- [ ] 15. Copy/Paste Program
+- [ ] 16. Copy/Paste Combi
+- [ ] 17. Batch Sort
+- [ ] 18. Undo/Redo
+
+Result: ___ / 18 PASSED
+```
 
 ---
 
-### soundcheck_COMPREHENSIVE.PCG
-**Purpose**: Test all editable timbre parameters on a single timbre
+## Pre-Test Setup
 
-**What to verify**:
-- Load the file on Kronos
-- Navigate to Combi I-A001 "Stradivarius Goes POP", Timbre 1
-- Check parameters:
-  - Volume: 99 ✓
-  - MIDI Channel: 8 ✓
-  - Transpose: +5 ✓
-  - Status: Int ✓
-  - Mute: False ✓
-  - Key Zone: C2 (36) to C7 (96) ✓
-  - Velocity Zone: 10 to 120 ✓
-- Test key zones by playing keys outside/inside range
-- Test velocity zones by playing soft/hard
+### 1. Prepare Test Environment
+- [ ] Kronos powered on and functioning
+- [ ] USB drive or SD card ready
+- [ ] Backup of current Kronos data (recommended)
+- [ ] PCG Tools GUI running: `python3 -m pcg_tools.gui_qt`
 
-**Test Result**: ✓ PASSED - All parameters verified correct on hardware!
+### 2. Create Test PCG File
+- [ ] Open a known-good PCG file in PCG Tools
+- [ ] Save As → `hardware_test_dec2025.PCG`
+- [ ] Copy to USB/SD card: `cp hardware_test_dec2025.PCG /Volumes/KEYBOARD/`
 
-**Test script**: `test_comprehensive_timbre.py`
+---
 
-**Test script**: `test_combi_timbre_direct.py`
+## Test 1: Basic File Load/Save Round-Trip
 
-## Important Notes
+**Purpose**: Verify file can be loaded and saved without corruption
 
-### Timbre Offset Fix (2024-11-27)
-The timbre data offset was corrected from 1024 to 4802 bytes from the combi start. This is based on the C# reference implementation:
-- `KronosTimbres.cs`: `TimbresOffsetConstant => 4802`
-- `KronosTimbre.cs`: `TimbresSizeConstant => 188`
+### Steps:
+1. [ ] Open original PCG file in PCG Tools
+2. [ ] Save As → `roundtrip_test.PCG`
+3. [ ] Copy to Kronos USB/SD
+4. [ ] Load on Kronos (DISK mode → Load PCG)
+5. [ ] Verify file loads without errors
+6. [ ] Navigate to a few programs/combis to verify data intact
 
-### Timbre Parameter Offsets (All Hardware Verified ✓)
-From the C# `Timbre.cs` and `KronosOasysTimbre.cs` implementation:
+**Result**: [ ] PASS  [ ] FAIL
 
-**Basic Parameters:**
-- **Volume**: TimbresOffset + 5, bits 7-0 (0-127) ✓ Tested
-- **MIDI Channel**: TimbresOffset + 2, bits 4-0 (0-15 in file, displayed as 1-16 on Kronos) ✓ Tested
-- **Transpose**: TimbresOffset + 7, bits 7-0 (signed byte, -128 to +127) ✓ Tested
-- **Status**: TimbresOffset + 2, bits 7-5 (0=Off, 1=Int, 2=Both, 3=Ext, 4=Ex2) ✓ Tested
-- **Detune**: TimbresOffset + 8, 2 bytes (signed, little-endian) ✓ Parsed
+**Notes**: _______________
 
-**Control Parameters:**
-- **Mute**: TimbresOffset + 34, bit 7 ✓ Tested
-- **Priority**: TimbresOffset + 35, bit 4 ✓ Parsed
-- **Portamento**: TimbresOffset + 36, bits 7-0 (signed) ✓ Parsed
+---
 
-**Oscillator Parameters:**
-- **Osc Mode**: TimbresOffset + 35, bits 1-0 (0=Prg, 1=Poly, 2=Mono, 3=Legato) ✓ Parsed
-- **Osc Select**: TimbresOffset + 35, bits 3-2 (0=Both, 1=Osc1, 2=Osc2) ✓ Parsed
+## Test 2: Program Name Editing
 
-**Zone Parameters:**
-- **Top Key**: TimbresOffset + 37, bits 7-0 (0-127) ✓ Tested
-- **Bottom Key**: TimbresOffset + 38, bits 7-0 (0-127) ✓ Tested
-- **Top Velocity**: TimbresOffset + 40, bits 7-0 (1-127) ✓ Tested
-- **Bottom Velocity**: TimbresOffset + 41, bits 7-0 (1-127) ✓ Tested
+**Purpose**: Verify program name changes persist on hardware
 
-**Important Notes**:
-- MIDI channels are stored as 0-15 in the file but displayed as 1-16 on the Kronos hardware. When you write channel 15 to the file, it will display as channel 16 on the Kronos.
-- **Pan is NOT a timbre parameter** - it's stored in the program that the timbre references. To change pan, you need to edit the program itself, not the timbre.
-- Key and velocity zones control which keys/velocities trigger the timbre. Values outside the zone will not sound.
+### Steps:
+1. [ ] In PCG Tools, select a program (e.g., I-A000)
+2. [ ] Double-click to edit
+3. [ ] Change name to "HW TEST PROG"
+4. [ ] Save file
+5. [ ] Copy to Kronos, load file
+6. [ ] Navigate to I-A000
+7. [ ] Verify name shows "HW TEST PROG"
 
-### Parameters Not Yet Tested on Hardware
-The following parameters are parsed but haven't been modified and tested on hardware yet:
-- **Detune**: Parsed correctly, needs write/test
-- **Priority**: Parsed correctly, needs write/test
-- **Portamento**: Parsed correctly, needs write/test
-- **Osc Mode**: Parsed correctly, needs write/test
-- **Osc Select**: Parsed correctly, needs write/test
-- **Program Pan**: Stored in the program data (not timbre level) - needs testing
+**Result**: [ ] PASS  [ ] FAIL
 
-### Checksum
-All PCG file modifications automatically recalculate the checksum using the `write_pcg_file()` function. The checksum is critical for the Kronos to accept the file.
+**Notes**: _______________
+
+---
+
+## Test 3: Program Category/Favorite Editing
+
+**Purpose**: Verify category and favorite flag changes
+
+### Steps:
+1. [ ] Select a program
+2. [ ] Edit → change category to "Keyboard"
+3. [ ] Edit → toggle favorite ON
+4. [ ] Save, copy to Kronos, load
+5. [ ] Verify category shows "Keyboard"
+6. [ ] Verify favorite star is displayed
+
+**Result**: [ ] PASS  [ ] FAIL
+
+**Notes**: _______________
+
+---
+
+## Test 4: Combi Name Editing
+
+**Purpose**: Verify combi name changes persist
+
+### Steps:
+1. [ ] Select a combi (e.g., I-A000)
+2. [ ] Double-click to edit
+3. [ ] Change name to "HW TEST COMBI"
+4. [ ] Save, copy to Kronos, load
+5. [ ] Navigate to combi I-A000
+6. [ ] Verify name shows "HW TEST COMBI"
+
+**Result**: [ ] PASS  [ ] FAIL
+
+**Notes**: _______________
+
+---
+
+## Test 5: Combi Timbre Volume
+
+**Purpose**: Verify timbre volume changes
+
+### Steps:
+1. [ ] Select a combi with multiple timbres
+2. [ ] Open timbre editor (double-click combi → Timbres tab)
+3. [ ] Change Timbre 1 volume to 50
+4. [ ] Change Timbre 2 volume to 100
+5. [ ] Save, copy to Kronos, load
+6. [ ] On Kronos, go to combi → TIMBRE/TRACK → Mixer
+7. [ ] Verify Timbre 1 = 50, Timbre 2 = 100
+
+**Result**: [ ] PASS  [ ] FAIL
+
+**Notes**: _______________
+
+---
+
+## Test 6: Combi Timbre MIDI Channel
+
+**Purpose**: Verify MIDI channel assignment
+
+### Steps:
+1. [ ] Select a combi
+2. [ ] Open timbre editor
+3. [ ] Change Timbre 1 MIDI channel to 5
+4. [ ] Save, copy to Kronos, load
+5. [ ] On Kronos, verify Timbre 1 shows Ch 5
+
+**Result**: [ ] PASS  [ ] FAIL
+
+**Notes**: _______________
+
+---
+
+## Test 7: Combi Timbre Transpose
+
+**Purpose**: Verify transpose changes
+
+### Steps:
+1. [ ] Select a combi
+2. [ ] Open timbre editor
+3. [ ] Change Timbre 1 transpose to +12
+4. [ ] Save, copy to Kronos, load
+5. [ ] Verify Timbre 1 transpose = +12
+6. [ ] Play keys - should sound one octave higher
+
+**Result**: [ ] PASS  [ ] FAIL
+
+**Notes**: _______________
+
+---
+
+## Test 8: Combi Timbre Key Zone
+
+**Purpose**: Verify key zone limits
+
+### Steps:
+1. [ ] Select a combi
+2. [ ] Open timbre editor
+3. [ ] Set Timbre 1 key zone: C3 (48) to C5 (72)
+4. [ ] Save, copy to Kronos, load
+5. [ ] Play keys below C3 - should NOT sound on Timbre 1
+6. [ ] Play keys C3-C5 - should sound
+7. [ ] Play keys above C5 - should NOT sound on Timbre 1
+
+**Result**: [ ] PASS  [ ] FAIL
+
+**Notes**: _______________
+
+---
+
+## Test 9: Setlist Name Editing
+
+**Purpose**: Verify setlist name changes
+
+### Steps:
+1. [ ] Go to Setlists tab
+2. [ ] Select Setlist 0
+3. [ ] Edit name to "HW TEST SETLIST"
+4. [ ] Save, copy to Kronos, load
+5. [ ] On Kronos, go to SET LIST mode
+6. [ ] Verify setlist name shows "HW TEST SETLIST"
+
+**Result**: [ ] PASS  [ ] FAIL
+
+**Notes**: _______________
+
+---
+
+## Test 10: Setlist Slot Name
+
+**Purpose**: Verify slot name changes
+
+### Steps:
+1. [ ] Select a setlist slot (e.g., Slot 0)
+2. [ ] Double-click to edit
+3. [ ] Change slot name to "TEST SLOT"
+4. [ ] Save, copy to Kronos, load
+5. [ ] On Kronos, verify slot shows "TEST SLOT"
+
+**Result**: [ ] PASS  [ ] FAIL
+
+**Notes**: _______________
+
+---
+
+## Test 11: Setlist Slot Color
+
+**Purpose**: Verify slot color changes
+
+### Steps:
+1. [ ] Select a setlist slot
+2. [ ] Edit → change color to Red (or another distinct color)
+3. [ ] Save, copy to Kronos, load
+4. [ ] On Kronos, verify slot displays with red background
+
+**Result**: [ ] PASS  [ ] FAIL
+
+**Notes**: _______________
+
+---
+
+## Test 12: Setlist Slot Volume
+
+**Purpose**: Verify slot volume changes
+
+### Steps:
+1. [ ] Select a setlist slot
+2. [ ] Edit → change volume to 80
+3. [ ] Save, copy to Kronos, load
+4. [ ] On Kronos, check slot volume = 80
+
+**Result**: [ ] PASS  [ ] FAIL
+
+**Notes**: _______________
+
+---
+
+## Test 13: Setlist Slot Transpose
+
+**Purpose**: Verify slot transpose changes
+
+### Steps:
+1. [ ] Select a setlist slot
+2. [ ] Edit → change transpose to +5
+3. [ ] Save, copy to Kronos, load
+4. [ ] On Kronos, verify transpose = +5
+5. [ ] Play keys - should sound 5 semitones higher
+
+**Result**: [ ] PASS  [ ] FAIL
+
+**Notes**: _______________
+
+---
+
+## Test 14: Setlist Slot Description
+
+**Purpose**: Verify slot description/notes
+
+### Steps:
+1. [ ] Select a setlist slot
+2. [ ] Edit → add description "Test description text"
+3. [ ] Save, copy to Kronos, load
+4. [ ] On Kronos, check slot description shows the text
+
+**Result**: [ ] PASS  [ ] FAIL
+
+**Notes**: _______________
+
+---
+
+## Test 15: Copy/Paste Program Within File
+
+**Purpose**: Verify internal copy/paste
+
+### Steps:
+1. [ ] Select program I-A000
+2. [ ] Copy (Ctrl+C)
+3. [ ] Select empty slot (e.g., U-A000)
+4. [ ] Paste (Ctrl+V)
+5. [ ] Save, copy to Kronos, load
+6. [ ] Verify U-A000 has same name/sound as I-A000
+
+**Result**: [ ] PASS  [ ] FAIL
+
+**Notes**: _______________
+
+---
+
+## Test 16: Copy/Paste Combi Within File
+
+**Purpose**: Verify combi copy preserves timbres
+
+### Steps:
+1. [ ] Select combi I-A000
+2. [ ] Copy (Ctrl+C)
+3. [ ] Select empty combi slot (e.g., U-A000)
+4. [ ] Paste (Ctrl+V)
+5. [ ] Save, copy to Kronos, load
+6. [ ] Verify U-A000 combi has same timbres/sound
+
+**Result**: [ ] PASS  [ ] FAIL
+
+**Notes**: _______________
+
+---
+
+## Test 17: Batch Sort Operation
+
+**Purpose**: Verify sort doesn't corrupt data
+
+### Steps:
+1. [ ] Select multiple programs in a bank
+2. [ ] Edit → Sort → By Name
+3. [ ] Verify programs are reordered alphabetically
+4. [ ] Save, copy to Kronos, load
+5. [ ] Verify sorted programs load and play correctly
+
+**Result**: [ ] PASS  [ ] FAIL
+
+**Notes**: _______________
+
+---
+
+## Test 18: Undo/Redo
+
+**Purpose**: Verify undo restores previous state
+
+### Steps:
+1. [ ] Make an edit (e.g., rename a program)
+2. [ ] Press Ctrl+Z (Undo)
+3. [ ] Verify name reverts to original
+4. [ ] Press Ctrl+Shift+Z (Redo)
+5. [ ] Verify name changes back
+
+**Result**: [ ] PASS  [ ] FAIL
+
+**Notes**: _______________
+
+---
+
+## Summary
+
+| Test | Result |
+|------|--------|
+| 1. Round-Trip | |
+| 2. Program Name | |
+| 3. Program Category/Favorite | |
+| 4. Combi Name | |
+| 5. Timbre Volume | |
+| 6. Timbre MIDI Channel | |
+| 7. Timbre Transpose | |
+| 8. Timbre Key Zone | |
+| 9. Setlist Name | |
+| 10. Slot Name | |
+| 11. Slot Color | |
+| 12. Slot Volume | |
+| 13. Slot Transpose | |
+| 14. Slot Description | |
+| 15. Copy/Paste Program | |
+| 16. Copy/Paste Combi | |
+| 17. Batch Sort | |
+| 18. Undo/Redo | |
+
+**Total Passed**: ___ / 18  
+**Overall Result**: [ ] ALL PASS  [ ] ISSUES FOUND
+
+---
+
+## Previous Test Results (Historical)
+
+### November 2024 Testing
+- ✅ Timbre Volume editing - PASSED
+- ✅ Timbre MIDI Channel - PASSED  
+- ✅ Timbre Transpose - PASSED
+- ✅ Timbre Status - PASSED
+- ✅ Timbre Key Zones - PASSED
+- ✅ Timbre Velocity Zones - PASSED
+- ✅ All 16 timbres simultaneous edit - PASSED
+- ✅ Checksum calculation - PASSED
+
+---
 
 ## Troubleshooting
 
-### File Won't Load
-- Check that the checksum was recalculated
-- Verify the file size matches the original
-- Check for corruption during copy
+### File Won't Load on Kronos
+- Checksum may be incorrect - file should auto-calculate on save
+- File may be corrupted - try fresh save
+- Check file size matches original
 
 ### Changes Don't Appear
-- Verify you're looking at the correct patch (bank/index)
-- Check that the offset calculations are correct
-- Compare byte-level changes with hex editor
+- Verify correct bank/slot selected
+- Check that file was saved before copying
+- Ensure USB/SD was properly ejected
 
-### Kronos Shows Error
-- The file structure may be corrupted
-- Checksum may be incorrect
-- Try loading the original base file first to verify hardware is working
+### Kronos Shows Error Message
+- Note the exact error message
+- Try loading original unmodified file to verify hardware works
+- Check PCG Tools console for any warnings during save

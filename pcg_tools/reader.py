@@ -46,6 +46,8 @@ class PcgReader:
         parser.parse_sls1_chunk(pcg)
         parser.parse_stl1_chunk(pcg)  # Parse color and text size metadata
         parser.parse_slot_notes(pcg)  # Parse slot notes/comments
+        parser.parse_dkt1_chunk(pcg)  # Parse drum kit banks
+        parser.parse_wsq1_chunk(pcg)  # Parse wave sequence banks
         
         # Add placeholder banks for unimplemented GM banks
         self._add_placeholder_banks(pcg)

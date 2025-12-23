@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
-"""Test script to verify program and combi parameter parsing."""
+"""Test script to verify program and combi parameter parsing.
 
+This is a standalone script, not a pytest test.
+Run with: python test_parameter_parsing.py <pcg_file>
+"""
+
+import pytest
 import sys
 from pcg_tools.reader import read_pcg_file
 
-def test_parameter_parsing(pcg_file):
+
+@pytest.mark.skip(reason="Standalone script - requires command line argument")
+def test_parameter_parsing(pcg_file=None):
     """Test parsing of program and combi parameters."""
     print(f"Testing parameter parsing on: {pcg_file}\n")
     

@@ -1,0 +1,4 @@
+# file: /Users/bmslater/Documents/projects/korg_pcg_tools/pcg_tools/master_files.py
+# hypothesis_version: 6.141.1
+
+['.pcg_tools', '1.0/1.1', '1.5/1.6', '1.x', '2.0', '2.x', '3.x', 'Krome', 'Krome EX', 'Kronos', 'Kross', 'Kross 2', 'Loaded', 'M3', 'M50', 'Not Present', 'Oasys', 'Trinity', 'Triton', 'Triton Extreme', 'Triton Karma', 'Triton LE', 'Unassigned', 'Unloaded', 'V2', 'V3', 'always', 'ask', 'auto_load', 'files', 'master_files.json', 'microStation', 'model', 'never', 'os_version', 'r', 'utf-8', 'w']

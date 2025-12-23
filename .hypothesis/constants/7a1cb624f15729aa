@@ -1,0 +1,4 @@
+# file: /Users/bmslater/Documents/projects/korg_pcg_tools/pcg_tools/sng_parser.py
+# hypothesis_version: 6.141.1
+
+[188, 4802, '\x00', '<H', '<I', 'ADT1', 'BMT1', 'BMT2', 'CUE1', 'MDT1', 'PDX1', 'PTN1', 'RGN1', 'SDK1', 'SDT1', 'SGS1', 'SNG1', 'SPR1', 'TRK1', 'ascii', 'rb', 'replace']

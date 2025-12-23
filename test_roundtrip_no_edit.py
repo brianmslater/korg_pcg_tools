@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
-"""Test roundtrip without any edits - just read and write."""
+"""Test roundtrip without any edits - just read and write.
 
+This is a standalone script, not a pytest test.
+Run with: python test_roundtrip_no_edit.py <input_file> <output_file>
+"""
+
+import pytest
 import sys
 import os
 from pcg_tools.reader import read_pcg_file
 from pcg_tools.writer import write_pcg_file
 
 
-def test_roundtrip(input_file, output_file):
+@pytest.mark.skip(reason="Standalone script - requires command line arguments")
+def test_roundtrip(input_file=None, output_file=None):
     """Test reading and writing without any edits."""
     print(f"Testing roundtrip (no edits) with: {input_file}")
     print("=" * 80)
@@ -62,8 +68,8 @@ def test_roundtrip(input_file, output_file):
 
 
 if __name__ == "__main__":
-    input_file = "test_files/soundcheck9_25_25_combined2.PCG"
-    output_file = "test_files/soundcheck_ROUNDTRIP_NO_EDIT.PCG"
+    input_file = "files_2_test/soundcheck9_25_25_combined2.PCG"
+    output_file = "files_2_test/soundcheck_ROUNDTRIP_NO_EDIT.PCG"
     
     if not os.path.exists(input_file):
         print(f"Error: Input file not found: {input_file}")

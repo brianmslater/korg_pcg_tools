@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
-"""Test program editing with soundcheck file - verify hardware compatibility."""
+"""Test program editing with soundcheck file - verify hardware compatibility.
 
+This is a standalone script, not a pytest test.
+Run with: python test_program_edit_soundcheck.py <input_file> <output_file>
+"""
+
+import pytest
 import sys
 import os
 from pcg_tools.reader import read_pcg_file
@@ -8,7 +13,8 @@ from pcg_tools.writer import write_pcg_file
 from pcg_tools.models import Category
 
 
-def test_program_edit(input_file, output_file):
+@pytest.mark.skip(reason="Standalone script - requires command line arguments")
+def test_program_edit(input_file=None, output_file=None):
     """Test editing a program and verify file integrity."""
     print(f"Testing program edit with: {input_file}")
     print("=" * 80)
@@ -156,8 +162,8 @@ def _update_program_raw_data(program):
 
 
 if __name__ == "__main__":
-    input_file = "test_files/soundcheck9_25_25_combined2.PCG"
-    output_file = "test_files/soundcheck_PROGRAM_EDIT_TEST.PCG"
+    input_file = "files_2_test/soundcheck9_25_25_combined2.PCG"
+    output_file = "files_2_test/soundcheck_PROGRAM_EDIT_TEST.PCG"
     
     if not os.path.exists(input_file):
         print(f"Error: Input file not found: {input_file}")

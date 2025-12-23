@@ -4,14 +4,32 @@
 import sys
 sys.path.insert(0, '.')
 
+import pytest
+import os
+
+TEST_FILE = "files_2_test/nw.PCG"
+TEST_FILE_EXISTS = os.path.exists(TEST_FILE)
+
 from pcg_tools.pcg_parser import PcgBinaryParser
+import pytest
+import os
+
+TEST_FILE = "files_2_test/nw.PCG"
+TEST_FILE_EXISTS = os.path.exists(TEST_FILE)
+
 from pcg_tools.writer import write_pcg_file
+import pytest
+import os
+
+TEST_FILE = "files_2_test/nw.PCG"
+TEST_FILE_EXISTS = os.path.exists(TEST_FILE)
+
 from pcg_tools.models import PcgFile, PcgHeader, WorkstationModel
 
 def test_timbre_edit():
     """Edit timbre properties with checksum fixing."""
-    input_file = 'test_files/soundcheck_BASE_FOR_TESTING.PCG'
-    output_file = 'test_files/soundcheck_TIMBRE_TEST.PCG'
+    input_file = 'files_2_test/nw.PCG'
+    output_file = 'files_2_test/soundcheck_TIMBRE_TEST.PCG'
     
     print("="*80)
     print("TIMBRE EDIT TEST")

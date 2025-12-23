@@ -1,0 +1,4 @@
+# file: /Users/bmslater/Documents/projects/korg_pcg_tools/pcg_tools/bank_creator.py
+# hypothesis_version: 6.141.1
+
+[b'\x00', b'\x00\x00\x00\x00', b'MBK1', b'PBK1', b'PRG1', 128, 4960, '-', '>I', 'A', 'AL-1', 'AL-1 and CX-3', 'EXi', 'GM', 'HD-1', 'I-', 'I-A', 'I-B', 'I-C', 'I-D', 'I-E', 'I-F', 'MOD-7', 'MS-20EX & PolysixEX', 'Program', 'STR-1', 'Single', 'U-', 'U-A', 'U-B', 'U-C', 'U-D', 'U-E', 'U-F', 'U-G', 'V', 'ascii']

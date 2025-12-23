@@ -4,12 +4,24 @@
 import sys
 sys.path.insert(0, '.')
 
+import pytest
+import os
+
+TEST_FILE = "files_2_test/nw.PCG"
+TEST_FILE_EXISTS = os.path.exists(TEST_FILE)
+
 from pcg_tools.pcg_parser import PcgBinaryParser
+import pytest
+import os
+
+TEST_FILE = "files_2_test/nw.PCG"
+TEST_FILE_EXISTS = os.path.exists(TEST_FILE)
+
 from pcg_tools.models import PcgFile, PcgHeader, WorkstationModel
 
 def test_find_offsets():
     """Examine binary data to find actual timbre offsets."""
-    input_file = 'test_files/soundcheck_BASE_FOR_TESTING.PCG'
+    input_file = 'files_2_test/nw.PCG'
     
     # Read file
     with open(input_file, 'rb') as f:

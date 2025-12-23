@@ -1,0 +1,553 @@
+# PCG Tools Development Prompts Log
+
+## 2024-12-19 - Phase 4: Settings Enhancements
+
+### Prompt: Continue to Phase 4, be sure to look at C# code
+
+Context: Continuing feature-parity-review spec implementation after completing Phase 1-2.
+
+Actions taken:
+1. Examined C# SettingsWindow.xaml and SettingsWindow.xaml.cs for complete settings structure
+2. Identified all settings tabs: PCG Window, Files, Edit, Cut/Copy/Paste, Sort, Categories
+3. Reviewed existing Python settings.py and window_settings.py implementations
+4. Implemented complete settings module with C# parity
+
+C# Settings Structure Found:
+- PCG Window Tab: ShowNumberOfReferencesColumn, SingleLinedSetListSlotDescriptions, ClearPatches options, FixReferences
+- Files Tab: AutoBackup (enabled, interval, max storage), MasterFile auto-load, Output directories
+- Edit Tab: RenameFileWhenPatchNameChanges
+- Cut/Copy/Paste Tab: Copy incomplete items, Paste duplicates, Overwrite filled items, Patch duplication checking
+- Sort Tab: Split character, Title/Artist order, Sort order options (6 combinations)
+- Categories Tab: Category Set A/B selection
+
+Files Created/Modified:
+- pcg_tools/settings.py - Enhanced with all C# settings (enums: ClearPatchesAlgorithm, AutoLoadMasterFiles, PatchDuplication, SortOrder)
+- pcg_tools/qt_settings_dialog.py - New settings dialog UI matching C# SettingsWindow.xaml
+- pcg_tools/gui_qt.py - Added Settings menu item under Tools menu
+- test_settings.py - Unit tests for settings module
+- .kiro/specs/feature-parity-review/tasks.md - Marked Phase 4 tasks complete
+
+All Phase 4 tasks completed:
+- 4.1.1 Reference column setting ✓
+- 4.1.2 Description display setting ✓
+- 4.1.3 Clear patches options ✓
+- 4.2.1 Auto-backup settings ✓
+- 4.2.2 Master file settings ✓
+- 4.2.3 Directory settings ✓
+- 4.3.1 Copy settings ✓
+- 4.3.2 Paste duplicate settings ✓
+- 4.3.3 Overwrite settings ✓
+- 4.3.4 Duplication checking settings ✓
+- 4.4.1 Sort settings ✓
+- 4.5.1 Category set selection ✓
+
+
+---
+
+## 2024-12-19 - Phase 4 Settings Verification Against C# (Continuation)
+
+Prompt: "continue to phase 4. be sure to look at C# code" (continued from previous session)
+
+Task: Verify Phase 4 Settings implementation against C# source code and fix discrepancies
+
+C# Source Files Verified:
+- pcg-tools-csharp/KorgKronosTools/Properties/Settings.Designer.cs (all 1078 lines)
+
+Discrepancies Found and Fixed (Python defaults corrected to match C#):
+1. CopyPaste_CopyIncompleteCombis: False → True
+2. CopyPaste_CopyIncompleteSetListSlots: False → True  
+3. CopyPaste_OverwriteFilledSetListSlots: False → True
+4. Sort_ArtistTitleSortOrder: False → True
+5. Edit_RenameFileWhenPatchNameChanges: False → True
+6. Settings_AutoBackupFilesEnabled: False → True
+7. UI_ShowNumberOfReferencesColumn: True → False
+8. SingleLinedSetListSlotDescriptions: True → False
+9. CopyPaste_PasteDuplicateDrumKits: True → False
+10. CopyPaste_PasteDuplicateDrumPatterns: True → False
+11. CopyPaste_PasteDuplicateWaveSequences: True → False
+
+Files Modified:
+- pcg_tools/settings.py - Fixed all 11 default values in __init__ and load() methods
+- test_settings.py - Updated test_settings_defaults() to verify C# defaults
+
+Test Results: All settings tests passed ✓
+
+
+---
+
+## 2024-12-19 - Phase 5: Edit Dialogs Implementation
+
+Prompt: "phase 5 and make sure to consult the C# code"
+
+Task: Implement Phase 5 Edit Dialogs - batch editing for combis and set list slots
+
+C# Source Files Examined:
+- pcg-tools-csharp/KorgKronosTools/Edit/WindowEditMultipleCombis.xaml - UI layout
+- pcg-tools-csharp/KorgKronosTools/Edit/WindowEditMultipleCombis.xaml.cs - Logic
+- pcg-tools-csharp/KorgKronosTools/Edit/WindowEditMultipleSetListSlots.xaml - UI layout
+- pcg-tools-csharp/KorgKronosTools/Edit/WindowEditMultipleSetListSlots.xaml.cs - Logic
+- pcg-tools-csharp/KorgKronosTools/Edit/WindowEditMultipleCombiBanks.xaml - Stub only (not implemented in C#)
+
+C# Features Found:
+1. WindowEditMultipleCombis:
+   - ID (read-only), Name, Favorite checkbox
+   - Category/SubCategory dropdowns (with master file fallback)
+   - Name length validation (X of Y characters)
+   - Error label for validation
+   - OK/Cancel buttons
+
+2. WindowEditMultipleSetListSlots:
+   - ID (read-only), Name
+   - Volume (IntegerUpDown 0-127)
+   - Description (multiline text with length validation)
+   - Name length and description length validation
+   - OK/Cancel buttons
+
+3. WindowEditMultipleCombiBanks:
+   - Just a stub/placeholder in C# (not implemented)
+
+Python Files Examined:
+- pcg_tools/qt_edit_dialog.py - Existing single patch edit dialogs
+- pcg_tools/gui_qt.py - edit_slot_name() method for slot editing
+
+
+
+---
+
+## 2024-12-19 - Phase 6: SNG File Support Implementation
+
+Prompt: Context transfer continuation - "ok next" (continuing Phase 6 SNG file support)
+
+Task: Implement Phase 6 SNG File Support - parsing and viewing Korg song files
+
+C# Source Files Examined:
+- pcg-tools-csharp/KorgKronosTools/Model/Common/File/SongFileReader.cs - Base SNG parser
+- pcg-tools-csharp/KorgKronosTools/Model/KronosSpecific/Song/KronosSongFileReader.cs - Kronos-specific
+- pcg-tools-csharp/KorgKronosTools/Model/Common/Synth/SongsRelated/Song.cs - Song model
+- pcg-tools-csharp/KorgKronosTools/Model/Common/Synth/SongsRelated/Songs.cs - Songs collection
+- pcg-tools-csharp/KorgKronosTools/Model/Common/Synth/SongsRelated/Region.cs - Audio region model
+- pcg-tools-csharp/KorgKronosTools/Model/Common/Synth/SongsRelated/Regions.cs - Regions collection
+- pcg-tools-csharp/KorgKronosTools/Model/Common/Synth/SongsRelated/SongMemory.cs - Memory container
+- pcg-tools-csharp/KorgKronosTools/Model/Common/Synth/SongsRelated/SongTimbre.cs - Timbre model
+- pcg-tools-csharp/KorgKronosTools/Model/Common/Synth/SongsRelated/SongTimbres.cs - Timbres collection
+- pcg-tools-csharp/KorgKronosTools/Model/KronosSpecific/Song/KronosSongMemory.cs - Kronos memory
+- pcg-tools-csharp/KorgKronosTools/SongWindow.xaml - Song window UI
+- pcg-tools-csharp/KorgKronosTools/SongWindow.xaml.cs - Song window logic
+- pcg-tools-csharp/KorgKronosTools/SongTimbresWindow.xaml - Timbres window UI
+
+C# SNG File Structure Found:
+- Header: 32 bytes
+- Chunks: SNG1, SDK1 (song names), SGS1/SDT1 (song data), RGN1 (audio regions)
+- Kronos constants: 188-byte timbres, 16 tracks, offset 0x12C2+12=4814
+- Region: 24-byte name, 84-byte sample filename
+
+Python Files Created:
+- pcg_tools/sng_models.py - Data models (SngFile, Song, SongTimbre, Region)
+- pcg_tools/sng_parser.py - SNG file parser (SngParser class, read_sng_file function)
+- pcg_tools/qt_sng_window.py - Qt window (SngWindow, SongTimbresDialog)
+- test_sng_parser.py - Unit tests for SNG parsing
+
+Python Files Modified:
+- pcg_tools/gui_qt.py - Added "Open SNG..." menu item (Ctrl+Shift+O), open_sng_file() method
+
+Features Implemented:
+- SNG file parsing with all chunk types (SDK1, SGS1, SDT1, BMT1, RGN1, etc.)
+- Songs tab with index/name columns
+- Samples tab with index/name/filename columns
+- MIDI Tracks button showing 16 timbres per song
+- Export to File functionality for both tabs
+- Program ID generation matching C# KronosSongMemory.ProgramIdByIndex()
+
+Test Results: 14 tests passed (1 skipped - no SNG test files available)
+
+Phase 6 Tasks Completed:
+- 6.1.1 Implement SNG file reader ✓
+- 6.2.1 Implement song window ✓
+- 6.2.2 Implement song timbres window ✓
+
+
+
+---
+
+## 2024-12-19 - Phase 7: Export Features Implementation
+
+Prompt: Context transfer continuation - continuing Phase 7 Export Features
+
+Task: Implement Phase 7 Export Features - Cubase export and Hex export
+
+C# Source Files Examined:
+- pcg-tools-csharp/KorgKronosTools/ViewModels/PcgViewModel.cs - ExportToCubase(), AddProgramInfoToCubase(), AddHeaderToCubase()
+- pcg-tools-csharp/KorgKronosTools/HexExportDlg.xaml - Hex export dialog UI
+- pcg-tools-csharp/KorgKronosTools/HexExportDlg.xaml.cs - Hex export dialog logic
+
+C# Cubase Export Format:
+- Header: [cubase parse file], [parser version 0001], [device manufacturer], [device name], etc.
+- Programs sorted by category/subcategory
+- GM banks get [g1] GM Bank header
+- Non-GM banks get [g1] Category and [g2] SubCategory headers
+- Program format: [p2/p3,index,0,bank_offset] ID Name
+
+C# Hex Export Format:
+- 16 columns per line
+- Format: relative_offset (decimal) absolute_offset: hex_bytes : ascii_chars
+- 4-byte grouping with spaces
+- Non-printable chars shown as '.'
+
+Python Files Created:
+- pcg_tools/cubase_export.py - Cubase instrument definition export
+- pcg_tools/hex_export.py - Hex dump generation
+- pcg_tools/qt_hex_export_dialog.py - Qt dialog for hex display
+- test_export_features.py - Unit tests for export features
+
+Python Files Modified:
+- pcg_tools/gui_qt.py - Added Tools → Export submenu with Cubase and Hex export
+- pcg_tools/models.py - Added byte_offset and byte_length properties to Program, Combi, SetListSlot
+
+Test Results: 12 tests passed
+
+Phase 7 Tasks Completed:
+- 7.1.1 Implement Cubase instrument definition export ✓
+- 7.2.1 Implement hex export dialog ✓
+
+
+
+---
+
+## 2024-12-19 - Phase 8: Additional Features Implementation (Partial)
+
+Prompt: Context transfer continuation - continuing Phase 8 Additional Features
+
+Task: Implement Phase 8 Additional Features - MPE init and Clear Program
+
+C# Source Files Examined:
+- pcg-tools-csharp/KorgKronosTools/Model/Common/Synth/PatchCombis/Combi.cs - InitAsMpe()
+- pcg-tools-csharp/KorgKronosTools/Model/Common/Synth/MemoryAndFactory/PcgMemory.cs - AssignedClearProgram
+- pcg-tools-csharp/KorgKronosTools/Model/Common/Synth/PatchCombis/Timbre.cs - Clear()
+- pcg-tools-csharp/KorgKronosTools/ViewModels/PcgViewModel.cs - InitAsMpeCombiCommand
+- pcg-tools-csharp/KorgKronosTools/ViewModels/CombiViewModel.cs - AssignedClearProgram display
+
+C# MPE Init Implementation:
+- Sets each timbre to unique MIDI channel (0-15)
+- Copies program reference from timbre 0 to all timbres
+- Copies parameters: Status, Mute, Volume, BottomKey, TopKey, BottomVelocity, TopVelocity, OscMode, OscSelect
+- Does NOT copy: Transpose, Detune, Portamento, Bend Range (negative values issue)
+
+C# Clear Program Implementation:
+- AssignedClearProgram property on PcgMemory
+- Defaults to first program in first bank
+- Used when clearing timbres in combis
+
+Python Files Created:
+- pcg_tools/mpe_init.py - MPE combi initialization
+- pcg_tools/clear_program.py - Clear program manager
+- test_additional_features.py - Unit tests for Phase 8 features
+
+Python Files Modified:
+- pcg_tools/gui_qt.py - Added menu items: Init as MPE Combi, Set as Clear Program
+
+Test Results: 11 tests passed
+
+Phase 8 Tasks Completed:
+- 8.2.1 Implement assigned clear program ✓
+- 8.4.1 Implement MPE combi initialization ✓
+
+Phase 8 Tasks Deferred (complex features):
+- 8.1.1 Virtual Banks - requires bank aggregation logic
+- 8.3.1 All Patches View - UI enhancement
+- 8.5.1 Double to Single Keyboard - requires dedicated window
+
+
+
+---
+Date: December 20, 2025
+Context: Phase 9 UI Polish - Completing all remaining tasks
+
+Prompt: "what is next? make sure to check the steering doc and dive deep and be throughout"
+
+Work Completed:
+1. Task 9.1.1 Theme Support - COMPLETED
+   - Verified C# implementation in MainWindow.xaml and MdiContainer.cs
+   - Updated tasks.md with correct implementation notes (theme IS user-configurable)
+   - Added Theme enum test to test_settings.py
+   - All 6 settings tests pass
+
+2. Task 9.3.1 Status Bar Enhancements - COMPLETED
+   - Enhanced status bar with multiple sections based on C# MainWindow.xaml
+   - Added: Model, FileType, Programs, Combis, SetLists, DrumKits, DrumPatterns, WaveSequences, Clipboard
+   - Created _update_status_bar_counts() and related methods
+   - Status bar updates on file load and copy operations
+
+3. Task 9.4.1 Window Navigation - COMPLETED
+   - Implemented tab navigation (adapted from C# MDI window navigation)
+   - F6 → Go to next tab, Ctrl+F6 → Go to previous tab
+   - Added View menu items
+
+4. Task 9.5.1 Help Menu - COMPLETED
+   - Enhanced Help menu with: About, Home Page, Manual, GitHub Repository
+   - Opens links in browser using webbrowser module
+
+5. Task 9.6.1 Advanced Sorting - COMPLETED
+   - Created patch_sorting.py module
+   - Ported TitleComparer, ArtistComparer, PatchSorter from C#
+   - Functions: get_title(), get_artist(), find_split_index(), sort_patches()
+   - SortOrder enum with 6 options
+   - Created test_patch_sorting.py with 14 tests (all pass)
+
+Phase 9 Status: COMPLETE (all 6 tasks done)
+
+
+## 2025-12-22 - Project Completion Verification
+
+### Prompt: what is next? make sure to check the steering doc and dive deep and be throughout
+
+Context: Verifying project completion status after context transfer from previous conversation.
+
+Actions taken:
+1. Read steering doc (.kiro/steering/pcgtoolssteeringdoc.md) - all "Tasks to Fix" marked ✅ COMPLETE
+2. Read feature-parity-review/tasks.md - all phases complete (10.2.2 hardware verification pending - requires physical Kronos)
+3. Read pcg-file-operations/tasks.md - all tasks complete
+4. Read pcg-file-structure/tasks.md - all tasks complete
+5. Ran test suite: 380 passed, 15 skipped, 1 xpassed, 24 warnings
+
+Project Status: COMPLETE
+- All 3 specs fully implemented
+- All steering doc tasks marked complete
+- All tests passing
+- Only remaining item: hardware verification (10.2.2) - requires physical Kronos hardware
+
+Intentionally deferred items (per C# parity):
+- Drum pattern support (C# throws NotImplementedException)
+- Legacy synthesizer support (.syx files) - low priority
+- Multi-language support - English only
+
+
+---
+
+## 2025-12-22 - Phase 11: Additional C# Parity Features
+
+### Prompt: Context transfer continuation - examining C# files for overlooked features
+
+Context: Continuing comprehensive C# feature parity review from previous conversation.
+
+Task: Identify and implement any missing features from C# that were overlooked in Python port.
+
+C# Source Files Examined:
+- pcg-tools-csharp/KorgKronosTools/ViewModels/PcgViewModel.cs - SetFavoriteCommand, UnsetFavoriteCommand, AssignCommand
+- pcg-tools-csharp/KorgKronosTools/MainWindow.xaml - Menu structure showing Set Favorite, Unset Favorite, Assign to Set List Slot
+
+Missing Features Identified:
+1. Set Favorite / Unset Favorite - Dedicated menu actions to quickly mark/unmark selected patches as favorites
+2. Assign to Set List Slot - Assigns the last selected program/combi to a set list slot
+
+C# Implementation Details:
+- SetFavoriteCommand (lines 3028-3100): Sets favorite=true on selected programs/combis
+- UnsetFavoriteCommand (lines 3112-3145): Sets favorite=false on selected programs/combis
+- AssignCommand (lines 2133-2200): Assigns LastSelectedProgramOrCombi to selected set list slot
+- LastSelectedProgramOrCombi: Tracks the last selected program or combi for assignment
+
+Python Files Modified:
+- pcg_tools/gui_qt.py:
+  - Added `last_selected_program_or_combi` tracking variable in __init__
+  - Added Edit → Set Favorite menu item
+  - Added Edit → Unset Favorite menu item
+  - Added Edit → Assign to Set List Slot menu item
+  - Added `set_favorite(bool)` method - ported from C# SetFavorite()
+  - Added `assign_to_setlist_slot()` method - ported from C# Assign()
+  - Added `_update_assign_action_state()` method - updates menu item enabled state and tooltip
+  - Added `_track_selected_program_or_combi()` method - tracks selection changes
+  - Connected itemSelectionChanged signals on programs_table and combis_table
+
+- .kiro/specs/feature-parity-review/tasks.md:
+  - Added Phase 11: Additional C# Parity Features section
+  - Documented all 4 new tasks as completed
+
+Test Results: 380 passed, 15 skipped, 1 xpassed, 24 warnings - ALL TESTS PASS
+
+Phase 11 Tasks Completed:
+- 11.1.1 Implement Set Favorite menu action ✓
+- 11.1.2 Implement Unset Favorite menu action ✓
+- 11.2.1 Implement last selected program/combi tracking ✓
+- 11.2.2 Implement Assign to Set List Slot action ✓
+
+
+### Additional Features Implemented (continued):
+
+3. Exit Copy/Paste Mode (Task 11.3.1)
+   - Added Edit → Exit Copy/Paste Mode menu item
+   - Calls clipboard.exit_copy_paste_mode()
+   - Updates status bar to show clipboard is empty
+
+4. Recall Clipboard (Task 11.3.2)
+   - Added Edit → Recall menu item
+   - Calls clipboard.recall() to restore previous clipboard contents
+   - Shows message with recalled items
+
+5. Auto-Fill Slot Names (Task 11.4.1)
+   - Added Tools → Auto-Fill Slot Names menu item
+   - Ported from C# AutoFillInSetListSlotNamesCommand
+   - Copies referenced patch name to slot name for selected slots
+   - Different from existing auto_fill_slots which creates new slots
+
+Note: Discovered that Python's auto_fill_slots was different from C# AutoFillInSetListSlotNames:
+- Python auto_fill_slots: Creates new slots and fills them with patches
+- C# AutoFillInSetListSlotNames: Copies patch name to slot name for existing slots
+Both features now exist in Python.
+
+Test Results: 380 passed, 15 skipped, 1 xpassed, 24 warnings - ALL TESTS PASS
+
+
+---
+
+## Session Summary - December 22, 2025
+
+### Task: Comprehensive C# Feature Parity Review (Continuation)
+
+**Objective**: Examine all C# files to identify any features overlooked in the Python port.
+
+**C# Files Examined**:
+- `pcg-tools-csharp/KorgKronosTools/ViewModels/PcgViewModel.cs` - All ICommand properties
+- `pcg-tools-csharp/KorgKronosTools/MainWindow.xaml` - Complete menu structure
+- `pcg-tools-csharp/KorgKronosTools/ViewModels/Commands/PcgCommands/ClearCommands.cs`
+
+**Missing Features Identified and Implemented**:
+
+1. **Set Favorite / Unset Favorite** (Edit menu)
+   - C# Source: PcgViewModel.SetFavoriteCommand, UnsetFavoriteCommand
+   - Python: `set_favorite(bool)` method, Edit → Set Favorite / Unset Favorite menu items
+
+2. **Assign to Set List Slot** (Edit menu)
+   - C# Source: PcgViewModel.AssignCommand, LastSelectedProgramOrCombi
+   - Python: `assign_to_setlist_slot()` method, `last_selected_program_or_combi` tracking
+   - Selection tracking via itemSelectionChanged signals on programs_table and combis_table
+
+3. **Exit Copy/Paste Mode** (Edit menu)
+   - C# Source: PcgViewModel.ExitCopyPasteModeCommand
+   - Python: `exit_copy_paste_mode()` method using clipboard.exit_copy_paste_mode()
+
+4. **Recall Clipboard** (Edit menu)
+   - C# Source: PcgViewModel.RecallCommand
+   - Python: `recall_clipboard()` method using clipboard.recall()
+
+5. **Auto-Fill Slot Names** (Tools menu)
+   - C# Source: PcgViewModel.AutoFillInSetListSlotNamesCommand
+   - Python: `auto_fill_slot_names()` method - copies referenced patch name to slot name
+   - Note: Different from existing `auto_fill_slots()` which creates new slots
+
+**Files Modified**:
+- `pcg_tools/gui_qt.py` - Added all new menu items and implementation methods
+- `.kiro/specs/feature-parity-review/tasks.md` - Added Phase 11 with new tasks
+- `Prompts_Used.txt` - Session logging
+
+**Test Results**: 380 passed, 15 skipped, 1 xpassed, 24 warnings - ALL TESTS PASS
+
+**Remaining Items** (intentionally deferred per C# parity):
+- Drum pattern support (C# throws NotImplementedException for Kronos)
+- Legacy synthesizer .syx file support (low priority)
+- Multi-language support (English only)
+- Hardware verification (requires physical Kronos)
+- External Links dialogs in Help menu (nice-to-have, not core functionality)
+
+---
+
+## Session: December 22, 2025 - List Generator Dialog Implementation
+
+**Context**: Continuing from previous session. Task was to add missing GUI features.
+
+**User Query**: "Before we start the tests, does the GUI have all of the features in it that we have ported?"
+
+**Work Performed**:
+
+1. **Audited GUI for Missing Features**
+   - Reviewed `pcg_tools/gui_qt.py` against all ported modules
+   - Found gap: List Generator (`list_generators.py`) had no GUI exposure
+   - All other features were already in GUI
+
+2. **Created List Generator Dialog** (`pcg_tools/qt_list_generator_dialog.py`)
+   - Based on C# `ListGeneratorWindow.xaml` and `ListGeneratorWindow.xaml.cs`
+   - Implemented all list types:
+     - Patch List
+     - Program Usage List
+     - Combi Content List
+     - Differences List
+     - File Content List
+   - Implemented all filter options:
+     - Program bank selection (I-A through I-H, GM, U-A through U-HH)
+     - Combi bank selection
+     - Virtual banks checkbox
+     - Set list range
+     - Text filter with case sensitivity
+     - Favorites filter
+   - Implemented output options:
+     - ASCII Table, Text, CSV, XML formats
+     - Sorting (Type/Bank/Index, Category, Alphabetical)
+     - Optional CRC columns
+     - Output file browser
+
+3. **Added Menu Item to GUI**
+   - Added "Generate &List..." to Tools menu in `gui_qt.py`
+   - Added `show_list_generator()` method to PcgMainWindow class
+   - Auto-detects other open windows for differences comparison
+
+4. **Updated Manual Test Documentation**
+   - Added Feature 7: List Generator to `test_gui_manual.md`
+   - Documented test cases for all list types
+
+**Files Created/Modified**:
+- `pcg_tools/qt_list_generator_dialog.py` - NEW: Qt dialog for list generator
+- `pcg_tools/gui_qt.py` - Added menu item and show_list_generator method
+- `test_gui_manual.md` - Added List Generator testing instructions
+
+**Test Results**: 380 passed, 15 skipped, 1 xpassed - ALL TESTS PASS
+
+
+================================================================================
+Date: December 23, 2025
+Context: Implementing C# Review Fixes from CSHARP_FULL_REVIEW.md
+================================================================================
+
+User Query 1: (Context transfer continuation)
+- Task: Implement all fixes identified in C# review
+- Files to read: CSHARP_FULL_REVIEW.md, clipboard.py, models.py, pcg_parser.py
+
+User Query 2: "Did you use the steering docs in the above review?"
+- Response: Explained that steering doc was used via context transfer
+
+User Query 3: "yes re-read"
+- Action: Re-read .kiro/steering/pcgtoolssteeringdoc.md to verify compliance
+
+Implementation Summary:
+1. Added OsVersion enum to models.py (Kronos OS versions 1.0/1.1, 1.5/1.6, 2.x, 3.x)
+2. Added SynthesisType enum to models.py (HD-1, EXi, AI, etc.)
+3. Enhanced clipboard.py with:
+   - CopyType enum
+   - ClipBoardPatch wrapper class
+   - _programs_by_type dict keyed by SynthesisType
+   - cut_paste_selected flag
+   - protected_patches set
+   - copy_file_name tracking
+   - find_program() and find_drum_kit() methods
+   - fix_references_to_program() and fix_references_to_combi() methods
+   - is_pasting_finished property
+4. Added Bank.is_filled property to models.py
+
+Tests: All 383 tests passed
+
+Remaining Gaps (from steering doc review):
+- CBK2/PBK2/STL2 chunk support for OS 1.5/1.6 not implemented
+- Combi copy with full timbre references partial
+- Range validation for Volume, Transpose, Index not added
+
+
+User Query 4: "lets review the architectural decisions"
+- Action: Reviewed C# KronosSetListSlot.cs for UsedPatch implementation
+- Found: OS 1.5/1.6 uses separate STL2/CBK2/PBK2 chunks for extended banks
+- Updated CSHARP_FULL_REVIEW.md with findings
+
+User Query 5: "the 1.5/1.6 OS can be set as a known limitation"
+- Action: Added OS 1.5/1.6 limitation to KNOWN_ISSUES.md
+- Updated CSHARP_FULL_REVIEW.md to mark as known limitation (ℹ️)
+
+Final Status:
+- All ⚠️ and ❌ items in CSHARP_FULL_REVIEW.md resolved
+- OS 1.5/1.6 documented as known limitation
+- All 383 tests passing

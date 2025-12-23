@@ -1,0 +1,4 @@
+# file: /Users/bmslater/Documents/projects/korg_pcg_tools/pcg_tools/writer.py
+# hypothesis_version: 6.141.1
+
+[b'\x00', b'\x1e\x02\x00\x00', b'(\x0f\x01\x00', b'KORG', b'PCG1', b'SBK1', b'SLS1', b'STL1', 104, 127, 128, 188, 255, 256, 1000, 4802, 4960, 7810, 10000, 69416, 69432, '<I', '<h', 'A', 'Both', 'Combi', 'Ex2', 'Ext', 'F', 'G', 'GM', 'I', 'I-', 'INT-', 'Int', 'Off', 'Program', 'U', 'U-', 'USER-', '_raw_offset', 'ascii', 'ignore', 'wb']

@@ -306,74 +306,31 @@ class PcgBinaryParser:
     def _extract_engine(self, program_data: bytes) -> str:
         """Extract engine type from program data.
         
-        For Kronos programs, the engine type is encoded in the program data.
-        Common engines: HD-1, AL-1, CX-3, STR-1, EP-1, MS-20EX, PolysixEX, MOD-7, SGX-1, SGX-2
+        Based on C# KronosProgram.cs:
+        - OSC Mode at offset 2558, bits 0-2 determines the synthesis type
+        - OSC Mode value 3 = "- (EXI)" means EXi engine
+        - Other values (Single, Double, Drums, Double Drums) mean HD-1 engine
+        
+        The C# code uses BankSynthesisType to track HD-1 vs EXi, but the actual
+        determination comes from the OSC Mode parameter.
+        
+        Reference: C# KronosProgram.cs GetParam(OscMode) and KronosProgramBank.cs
         """
-        if len(program_data) < 100:
+        if len(program_data) < 2560:
             return ""
         
-        # Engine type is typically at offset 0x58 (88) for Kronos
-        # It's a 2-byte value that maps to engine types
         try:
-            engine_byte = program_data[0x58] if len(program_data) > 0x58 else 0
+            # OSC Mode at offset 2558, bits 0-2
+            # Values: 0=Single, 1=Double, 2=Drums, 3=EXi, 4=Unused, 5=Double Drums
+            osc_mode_raw = struct.unpack('<H', program_data[2558:2560])[0]
+            osc_mode_value = osc_mode_raw & 0x07  # Extract lower 3 bits
             
-            # Kronos engine mapping (based on analysis of real PCG files)
-            engine_map = {
-                0x00: "HD-1",      # HD-1 Synthesizer (default)
-                0x01: "HD-1",      # HD-1 (alternate)
-                0x02: "HD-1",      # HD-1 (pads)
-                0x04: "SGX-1",     # SGX-1 Piano
-                0x05: "SGX-1",     # SGX-1 (harpsichord)
-                0x08: "SGX-1",     # SGX-1 (alternate)
-                0x0B: "SGX-1",     # SGX-1 Piano
-                0x0C: "MS-20EX",   # MS-20EX Analog
-                0x0D: "PolysixEX", # PolysixEX Analog
-                0x0E: "MOD-7",     # MOD-7 VPM
-                0x13: "SGX-2",     # SGX-2 Electric Piano (MK I, etc.)
-                0x15: "SGX-2",     # SGX-2 Electric Piano (alternate)
-                0x1B: "CX-3",      # CX-3 Organ
-                0x1F: "STR-1",     # STR-1 Strings
-                0x21: "HD-1",      # HD-1 (alternate)
-                0x22: "HD-1",      # HD-1 (alternate)
-                0x23: "AL-1",      # AL-1 Analog Synthesizer
-                0x25: "AL-1",      # AL-1 Analog Synthesizer (vintage)
-                0x27: "AL-1",      # AL-1 Analog Synthesizer (alternate)
-                0x28: "HD-1",      # HD-1 Synthesizer
-                0x29: "AL-1",      # AL-1 Analog Synthesizer  
-                0x2A: "STR-1",     # STR-1 String Synthesizer
-                0x2B: "SGX-2",     # SGX-2 Electric Piano
-                0x2C: "MOD-7",     # MOD-7 Waveshaping VPM
-                0x2D: "CX-3",      # CX-3 Tonewheel Organ
-                0x2E: "MOD-7",     # MOD-7 (alternate)
-                0x30: "MOD-7",     # MOD-7 (alternate)
-                0x33: "STR-1",     # STR-1 (alternate)
-                0x38: "SGX-1",     # SGX-1 Piano (alternate)
-                0x39: "SGX-2",     # SGX-2 EP (alternate)
-                0x40: "EXi",       # EXi sample-based
-                0x4D: "EXi",       # EXi sample-based (alternate)
-                0x52: "EXi",       # EXi sample-based (alternate)
-                0x55: "EXi",       # EXi sample-based (alternate)
-                0x5A: "EXi",       # EXi sample-based (alternate)
-                0x5B: "EXi",       # EXi sample-based (alternate)
-                0x5D: "AL-1",      # AL-1 (brass/lead)
-                0x64: "EXi",       # EXi sample-based (guitar)
-                0x69: "EXi",       # EXi sample-based (alternate)
-                0x8D: "EXi",       # EXi sample-based (alternate)
-                0x95: "EXi",       # EXi sample-based (alternate)
-                0xC5: "EXi",       # EXi sample-based (alternate)
-            }
-            
-            engine = engine_map.get(engine_byte, f"0x{engine_byte:02X}")
-            
-            # Fallback: search for engine name in ASCII data
-            if engine.startswith("0x"):
-                raw_str = program_data[:200].decode('ascii', errors='ignore')
-                known_engines = ['HD-1', 'AL-1', 'CX-3', 'STR-1', 'EP-1', 'MS-20', 'Polysix', 'MOD-7', 'SGX-1', 'SGX-2']
-                for eng in known_engines:
-                    if eng in raw_str:
-                        return eng
-            
-            return engine
+            # OSC Mode 3 = "- (EXI)" indicates EXi engine
+            if osc_mode_value == 3:
+                return "EXi"
+            else:
+                # All other modes (Single, Double, Drums, Double Drums) are HD-1
+                return "HD-1"
         except:
             return ""
     
@@ -1021,19 +978,31 @@ class PcgBinaryParser:
                 # Based on C# KronosProgramBanks.cs:
                 # I-A through I-F: 0-5
                 # GM: 6
+                # g(1) through g(9): 7-15 (GM2 sub-banks)
+                # g(d): 16 (GM2 drums)
                 # U-A through U-G: 17-23
                 # U-AA through U-GG: 24-30
+                # Virtual banks: 48+ (0x30+)
                 prog_bank = "I-A"
                 if prog_bank_byte <= 5:  # I-A through I-F (0-5)
                     prog_bank = f"I-{chr(65 + prog_bank_byte)}"
                 elif prog_bank_byte == 6:  # GM bank
                     prog_bank = "GM"
+                elif 7 <= prog_bank_byte <= 15:  # g(1) through g(9) (GM2 sub-banks)
+                    prog_bank = f"g({prog_bank_byte - 6})"
+                elif prog_bank_byte == 16:  # g(d) (GM2 drums)
+                    prog_bank = "g(d)"
                 elif 17 <= prog_bank_byte <= 23:  # U-A through U-G (17-23)
                     user_idx = prog_bank_byte - 17
                     prog_bank = f"U-{chr(65 + user_idx)}"
                 elif 24 <= prog_bank_byte <= 30:  # U-AA through U-GG (24-30)
                     user_idx = prog_bank_byte - 24
                     prog_bank = f"U-{chr(65 + user_idx)}{chr(65 + user_idx)}"
+                elif prog_bank_byte >= 48:  # Virtual banks (0x30+)
+                    vbank_idx = prog_bank_byte - 48
+                    group = vbank_idx // 8
+                    bank_letter = chr(65 + (vbank_idx % 8))
+                    prog_bank = f"V{group}-{bank_letter}"
                 else:
                     prog_bank = f"?-{prog_bank_byte}"  # Unknown bank
                 
@@ -1049,6 +1018,13 @@ class PcgBinaryParser:
                 
                 # Volume (offset +5, bits 7-0)
                 volume = self.data[timbre_offset + 5] if timbre_offset + 5 < len(self.data) else 127
+                
+                # Bend Range (offset +6, bits 7-0, signed) - from C# Timbre.cs
+                bend_range = 0
+                if timbre_offset + 6 < len(self.data):
+                    bend_range_byte = self.data[timbre_offset + 6]
+                    # Convert unsigned byte to signed (-128 to +127)
+                    bend_range = bend_range_byte if bend_range_byte < 128 else bend_range_byte - 256
                 
                 # Pan - not a timbre parameter (stored in program)
                 pan = 64
@@ -1114,6 +1090,7 @@ class PcgBinaryParser:
                     pan=pan,
                     mute=mute,
                     priority=priority,
+                    bend_range=bend_range,
                     detune=detune,
                     transpose=transpose,
                     portamento=portamento,
@@ -1304,6 +1281,20 @@ class PcgBinaryParser:
         - Notes/descriptions
         
         This should be called AFTER parse_sls1_chunk to override with complete data.
+        
+        SBK1 structure (from C# PcgFileReader.cs ReadSetList method):
+        - 'SBK1' marker (4 bytes)
+        - Chunk size (4 bytes)
+        - Unknown (4 bytes)
+        - Number of setlists (4 bytes)
+        - Chunk size for slots (4 bytes) - total size of all slot data
+        - Unknown (8 bytes)
+        - For each setlist:
+          - Name (24 bytes)
+          - 128 slots × slot_size
+          - Gap (16 bytes)
+        
+        Slot size = chunk_size / number_of_setlists
         """
         from .models import SetList, SetListSlot
         
@@ -1323,31 +1314,48 @@ class PcgBinaryParser:
         
         debug_print(f"Found SBK1 at offset {sbk1_offset:08X}")
         
-        # SBK1 data starts at +8 (after 'SBK1' and size)
-        sbk1_data_start = sbk1_offset + 8
+        # Read SBK1 header values (matching C# ReadSetList method)
+        # C# code flow:
+        #   Index += 4;  // Skip 'SBK1'
+        #   sbk1ChunkSize = GetInt(Index, 4);  // at +4
+        #   Index += 8;  // Skip size + unknown -> at +12
+        #   numberOfSetLists = GetInt(Index, 4);  // at +12
+        #   Index += 4;  // -> at +16
+        #   chunkSize = GetInt(Index, 4);  // at +16
+        #   Index += 8;  // Skip chunkSize + unknown -> at +24
+        #   // Now at +24, setlist data starts
         
-        # Each setlist structure:
-        # - 16 bytes: Header
-        # - 24 bytes: Setlist name
-        # - 128 × 542 bytes: Slots
-        # Total: 69,416 bytes per setlist
-        SETLIST_SIZE = 16 + 24 + (128 * 542)
-        SLOT_SIZE = 542
+        num_setlists = self.get_int(sbk1_offset + 12, 4)
+        chunk_size = self.get_int(sbk1_offset + 16, 4)
         
-        debug_print(f"Parsing all setlists from STL1 (up to 128)")
+        # Calculate slot size from chunk data (C#: sizeOfASetListSlot = chunkSize/numberOfSetLists)
+        if num_setlists > 0:
+            SLOT_SIZE = chunk_size // num_setlists
+        else:
+            SLOT_SIZE = 542  # Fallback to default
         
-        # Parse up to 128 setlists
+        debug_print(f"SBK1 header: num_setlists={num_setlists}, chunk_size={chunk_size}, slot_size={SLOT_SIZE}")
+        
+        # Data starts at SBK1 + 24 (after header)
+        data_start = sbk1_offset + 24
+        
+        debug_print(f"Parsing all setlists from STL1 (up to {num_setlists})")
+        
+        # Calculate setlist size: 24 (name) + 128 * slot_size + 16 (gap)
+        SETLIST_SIZE = 24 + (128 * SLOT_SIZE) + 16
+        
+        # Parse setlists
         setlists_parsed = 0
-        for setlist_idx in range(128):
-            setlist_start = sbk1_data_start + (setlist_idx * SETLIST_SIZE)
+        for setlist_idx in range(num_setlists):
+            setlist_start = data_start + (setlist_idx * SETLIST_SIZE)
             
             # Check if we have enough data for this setlist
             if setlist_start + SETLIST_SIZE > len(self.data):
                 debug_print(f"Reached end of data at setlist {setlist_idx}")
                 break
             
-            # Read setlist name at +16
-            setlist_name = self.get_string(setlist_start + 16, 24)
+            # Read setlist name (24 bytes at start of setlist)
+            setlist_name = self.get_string(setlist_start, 24)
             
             # Skip empty setlists
             if not setlist_name:
@@ -1369,7 +1377,8 @@ class PcgBinaryParser:
                 debug_print(f"Updating setlist {setlist_idx}: '{setlist_name}'")
             
             # Parse 128 slots for this setlist
-            first_slot_offset = setlist_start + 40
+            # Slots start after the 24-byte name
+            first_slot_offset = setlist_start + 24
             for slot_idx in range(128):
                 slot_offset = first_slot_offset + (slot_idx * SLOT_SIZE)
                 
@@ -1416,9 +1425,10 @@ class PcgBinaryParser:
                 
                 if slot_offset + 28 < len(self.data):
                     # Read patch type from byte +24, bits 1-0
+                    # C# enum: Program = 1, Combi = 0, Song = 2
                     type_byte = self.data[slot_offset + 24]
                     type_value = type_byte & 0x03  # Get bits 1-0
-                    type_map = {0: 'Program', 1: 'Combi', 2: 'Song'}
+                    type_map = {0: 'Combi', 1: 'Program', 2: 'Song'}
                     patch_type = type_map.get(type_value, 'Program')
                     
                     bank_byte = self.data[slot_offset + 25]
@@ -1428,83 +1438,53 @@ class PcgBinaryParser:
                     # Decode bank ID from bits 4-0 of byte 25
                     bank_id = bank_byte & 0x1F  # Extract bits 4-0
                     
-                    # Bank mapping for setlist slots:
-                    # 0-6: I-A through I-G (Internal banks)
-                    # 7-13: U-A through U-G (User banks)
-                    # 14: GM
-                    # 15-23: g(1) through g(9) (EXi banks)
-                    # 24: g(d) (EXi drums)
-                    # 25-31: U-AA through U-GG (Extended user banks)
-                    if bank_id <= 6:
-                        patch_bank = f"I-{chr(65 + bank_id)}"  # I-A to I-G
-                    elif 7 <= bank_id <= 13:
-                        patch_bank = f"U-{chr(65 + (bank_id - 7))}"  # U-A to U-G
-                    elif bank_id == 14:
-                        patch_bank = "GM"
-                    elif 15 <= bank_id <= 23:
-                        # g(1) through g(9)
-                        patch_bank = f"g({bank_id - 14})"
-                    elif bank_id == 24:
-                        patch_bank = "g(d)"
-                    elif 25 <= bank_id <= 31:
-                        # U-AA through U-GG (extended user banks)
-                        letter = chr(65 + (bank_id - 25))  # A-G
-                        patch_bank = f"U-{letter}{letter}"  # U-AA, U-BB, etc.
+                    # Bank mapping differs between Programs and Combis:
+                    # 
+                    # For PROGRAMS (patch_type == 'Program'), bank_id is a PcgId:
+                    #   PcgId 0-5: I-A through I-F
+                    #   PcgId 6: GM
+                    #   PcgId 7-16: g(1) through g(9), g(d) (GM2 variation banks)
+                    #   PcgId 17-23: U-A through U-G
+                    #   PcgId 24-30: U-AA through U-GG
+                    #
+                    # For COMBIS (patch_type == 'Combi'), bank_id is a direct array index:
+                    #   Index 0-6: I-A through I-G
+                    #   Index 7-13: U-A through U-G
+                    #   Index 14+: Virtual banks
+                    
+                    if patch_type == 'Program':
+                        # Program bank mapping (PcgId)
+                        if bank_id <= 5:
+                            patch_bank = f"I-{chr(65 + bank_id)}"  # I-A to I-F (PcgId 0-5)
+                        elif bank_id == 6:
+                            patch_bank = "GM"
+                        elif 7 <= bank_id <= 16:
+                            # GM2 variation banks g(1) through g(9), g(d)
+                            if bank_id <= 15:
+                                patch_bank = f"g({bank_id - 6})"  # g(1) to g(9)
+                            else:
+                                patch_bank = "g(d)"  # g(d) = drums
+                        elif 17 <= bank_id <= 23:
+                            patch_bank = f"U-{chr(65 + (bank_id - 17))}"  # U-A to U-G (PcgId 17-23)
+                        elif 24 <= bank_id <= 30:
+                            # U-AA through U-GG (extended user banks, PcgId 24-30)
+                            letter = chr(65 + (bank_id - 24))  # A-G
+                            patch_bank = f"U-{letter}{letter}"  # U-AA, U-BB, etc.
+                        else:
+                            patch_bank = f"?{bank_id}"
                     else:
-                        patch_bank = f"?{bank_id}"
+                        # Combi bank mapping (direct array index)
+                        if bank_id <= 6:
+                            patch_bank = f"I-{chr(65 + bank_id)}"  # I-A to I-G (index 0-6)
+                        elif 7 <= bank_id <= 13:
+                            patch_bank = f"U-{chr(65 + (bank_id - 7))}"  # U-A to U-G (index 7-13)
+                        else:
+                            patch_bank = f"?{bank_id}"
                     
                     patch_index = index_byte
                     
-                    # IMPORTANT: STL1 patch type bits are unreliable in some files.
-                    # Verify the patch type by checking which bank actually has a patch.
-                    if patch_bank and patch_index is not None and pcg:
-                        # Check if a program exists at this location
-                        prog_exists = False
-                        for prog_bank in pcg.program_banks:
-                            if prog_bank.bank_id == patch_bank:
-                                if 0 <= patch_index < len(prog_bank.patches):
-                                    prog = prog_bank.patches[patch_index]
-                                    if prog and prog.name and not prog.name.startswith("[Empty"):
-                                        prog_exists = True
-                                break
-                        
-                        # Check if a combi exists at this location
-                        combi_exists = False
-                        for combi_bank in pcg.combi_banks:
-                            if combi_bank.bank_id == patch_bank:
-                                if 0 <= patch_index < len(combi_bank.patches):
-                                    combi = combi_bank.patches[patch_index]
-                                    if combi and combi.name and not combi.name.startswith("[Empty"):
-                                        combi_exists = True
-                                break
-                        
-                        # If both exist, prefer the one that matches the slot name
-                        if prog_exists and combi_exists:
-                            # Check which name matches better
-                            prog_name = ""
-                            combi_name = ""
-                            for prog_bank in pcg.program_banks:
-                                if prog_bank.bank_id == patch_bank and 0 <= patch_index < len(prog_bank.patches):
-                                    prog_name = prog_bank.patches[patch_index].name
-                                    break
-                            for combi_bank in pcg.combi_banks:
-                                if combi_bank.bank_id == patch_bank and 0 <= patch_index < len(combi_bank.patches):
-                                    combi_name = combi_bank.patches[patch_index].name
-                                    break
-                            
-                            # If slot name matches combi name, it's a combi
-                            if slot_name and combi_name and slot_name.lower() in combi_name.lower():
-                                patch_type = "Combi"
-                            elif slot_name and prog_name and slot_name.lower() in prog_name.lower():
-                                patch_type = "Program"
-                            # Otherwise, prefer combi if STL1 says program (common error)
-                            elif patch_type == "Program":
-                                patch_type = "Combi"
-                        # If only one exists, use that
-                        elif combi_exists and not prog_exists:
-                            patch_type = "Combi"
-                        elif prog_exists and not combi_exists:
-                            patch_type = "Program"
+                    # Note: The C# code trusts the type bits from the file without verification.
+                    # We should do the same - the type bits are authoritative.
                 
                 # Find or create slot
                 slot = None
@@ -1651,3 +1631,230 @@ class PcgBinaryParser:
                 search_start = name_offset + 1
         
         debug_print(f"Parsed {notes_found} slot notes")
+
+
+    def parse_dkt1_chunk(self, pcg: PcgFile):
+        """Parse DKT1 chunk containing drum kit banks.
+        
+        Based on C# PcgFileReader.ReadDkt1Chunk().
+        """
+        from .models import DrumKit, DrumKitBank
+        
+        # Search for DKT1 anywhere in the file
+        dkt1_offset = self.data.find(b'DKT1')
+        if dkt1_offset < 0:
+            debug_print("DKT1 chunk not found")
+            return
+        
+        offset = dkt1_offset
+        chunk_size = self.get_int(offset + 4, 4)
+        debug_print(f"Found DKT1 at offset {offset:08X}, size {chunk_size:08X}")
+        
+        chunk_end = offset + 8 + chunk_size
+        offset += 12  # Skip chunk header (8) + gap (4)
+        
+        while offset < chunk_end - 8 and offset < len(self.data) - 8:
+            sub_id = self.data[offset:offset+4]
+            
+            if sub_id != b'DBK1':
+                break
+            
+            bank_info = self._parse_dbk1_chunk(offset)
+            if bank_info:
+                pcg.drum_kit_banks.append(bank_info)
+                # Move to next chunk
+                sub_size = self.get_int(offset + 4, 4)
+                offset += 12 + sub_size
+            else:
+                break
+        
+        pcg.has_drum_kits = len(pcg.drum_kit_banks) > 0
+        debug_print(f"Parsed {len(pcg.drum_kit_banks)} drum kit banks")
+    
+    def _parse_dbk1_chunk(self, dbk1_offset: int):
+        """Parse DBK1 (drum kit bank) chunk.
+        
+        Based on C# PcgFileReader.ReadDbk1Chunk().
+        
+        DBK1 structure (Kronos/Oasys):
+        - +0: 'DBK1' (4 bytes)
+        - +4: chunk size (4 bytes)
+        - +8: header (4 bytes)
+        - +12: num_drum_kits (4 bytes)
+        - +16: drum_kit_size (4 bytes)
+        - +20: bank_id (4 bytes)
+        - +24: drum kit data starts
+        """
+        from .models import DrumKit, DrumKitBank
+        
+        if len(self.data) < dbk1_offset + 24:
+            return None
+        
+        # Verify DBK1 chunk
+        if self.data[dbk1_offset:dbk1_offset+4] != b'DBK1':
+            return None
+        
+        chunk_size = self.get_int(dbk1_offset + 4, 4)
+        
+        # Read bank info
+        num_drum_kits = self.get_int(dbk1_offset + 12, 4)
+        drum_kit_size = self.get_int(dbk1_offset + 16, 4)
+        bank_id = self.get_int(dbk1_offset + 20, 4)
+        
+        # Convert bank ID to name
+        if bank_id == 0:
+            bank_name = 'INT'
+        elif bank_id >= 0x20000:
+            user_idx = bank_id - 0x20000
+            if user_idx < 7:
+                bank_name = f'USER-{chr(65 + user_idx)}'
+            elif user_idx < 14:
+                letter = chr(65 + (user_idx - 7))
+                bank_name = f'USER-{letter}{letter}'
+            else:
+                bank_name = f'UNKNOWN-{bank_id:X}'
+        else:
+            bank_name = f'UNKNOWN-{bank_id:X}'
+        
+        # Parse drum kit names
+        drum_kits = []
+        kit_offset = dbk1_offset + 24
+        
+        for i in range(num_drum_kits):
+            if kit_offset + 24 > len(self.data):
+                break
+            
+            # Drum kit name is at the start of each drum kit (24 bytes)
+            name = self.get_string(kit_offset, 24)
+            
+            drum_kit = DrumKit(
+                bank=bank_name,
+                index=i,
+                name=name,
+                raw_data=self.data[kit_offset:kit_offset+drum_kit_size],
+                _raw_offset=kit_offset
+            )
+            drum_kits.append(drum_kit)
+            kit_offset += drum_kit_size
+        
+        return DrumKitBank(
+            bank_id=bank_name,
+            drum_kits=drum_kits,
+            byte_offset=dbk1_offset,
+            patch_size=drum_kit_size,
+            is_writable=(bank_id >= 0x20000),  # User banks are writable
+            is_loaded=True
+        )
+    
+    def parse_wsq1_chunk(self, pcg: PcgFile):
+        """Parse WSQ1 chunk containing wave sequence banks.
+        
+        Based on C# PcgFileReader.ReadWsq1Chunk().
+        """
+        from .models import WaveSequence, WaveSequenceBank
+        
+        # Search for WSQ1 anywhere in the file
+        wsq1_offset = self.data.find(b'WSQ1')
+        if wsq1_offset < 0:
+            debug_print("WSQ1 chunk not found")
+            return
+        
+        offset = wsq1_offset
+        chunk_size = self.get_int(offset + 4, 4)
+        debug_print(f"Found WSQ1 at offset {offset:08X}, size {chunk_size:08X}")
+        
+        chunk_end = offset + 8 + chunk_size
+        offset += 12  # Skip chunk header (8) + gap (4)
+        
+        while offset < chunk_end - 8 and offset < len(self.data) - 8:
+            sub_id = self.data[offset:offset+4]
+            
+            if sub_id != b'WBK1':
+                break
+            
+            bank_info = self._parse_wbk1_chunk(offset)
+            if bank_info:
+                pcg.wave_sequence_banks.append(bank_info)
+                # Move to next chunk
+                sub_size = self.get_int(offset + 4, 4)
+                offset += 12 + sub_size
+            else:
+                break
+        
+        pcg.has_wave_sequences = len(pcg.wave_sequence_banks) > 0
+        debug_print(f"Parsed {len(pcg.wave_sequence_banks)} wave sequence banks")
+    
+    def _parse_wbk1_chunk(self, wbk1_offset: int):
+        """Parse WBK1 (wave sequence bank) chunk.
+        
+        Based on C# PcgFileReader.ReadWbk1Chunk().
+        
+        WBK1 structure:
+        - +0: 'WBK1' (4 bytes)
+        - +4: chunk size (4 bytes)
+        - +8: header (4 bytes)
+        - +12: num_wave_seqs (4 bytes)
+        - +16: wave_seq_size (4 bytes)
+        - +20: bank_id (4 bytes)
+        - +24: wave sequence data starts
+        """
+        from .models import WaveSequence, WaveSequenceBank
+        
+        if len(self.data) < wbk1_offset + 24:
+            return None
+        
+        # Verify WBK1 chunk
+        if self.data[wbk1_offset:wbk1_offset+4] != b'WBK1':
+            return None
+        
+        chunk_size = self.get_int(wbk1_offset + 4, 4)
+        
+        # Read bank info
+        num_wave_seqs = self.get_int(wbk1_offset + 12, 4)
+        wave_seq_size = self.get_int(wbk1_offset + 16, 4)
+        bank_id = self.get_int(wbk1_offset + 20, 4)
+        
+        # Convert bank ID to name
+        if bank_id == 0:
+            bank_name = 'INT'
+        elif bank_id >= 0x20000:
+            user_idx = bank_id - 0x20000
+            if user_idx < 7:
+                bank_name = f'USER-{chr(65 + user_idx)}'
+            elif user_idx < 14:
+                letter = chr(65 + (user_idx - 7))
+                bank_name = f'USER-{letter}{letter}'
+            else:
+                bank_name = f'UNKNOWN-{bank_id:X}'
+        else:
+            bank_name = f'UNKNOWN-{bank_id:X}'
+        
+        # Parse wave sequence names
+        wave_sequences = []
+        ws_offset = wbk1_offset + 24
+        
+        for i in range(num_wave_seqs):
+            if ws_offset + 24 > len(self.data):
+                break
+            
+            # Wave sequence name is at the start (24 bytes)
+            name = self.get_string(ws_offset, 24)
+            
+            wave_seq = WaveSequence(
+                bank=bank_name,
+                index=i,
+                name=name,
+                raw_data=self.data[ws_offset:ws_offset+wave_seq_size],
+                _raw_offset=ws_offset
+            )
+            wave_sequences.append(wave_seq)
+            ws_offset += wave_seq_size
+        
+        return WaveSequenceBank(
+            bank_id=bank_name,
+            wave_sequences=wave_sequences,
+            byte_offset=wbk1_offset,
+            patch_size=wave_seq_size,
+            is_writable=(bank_id >= 0x20000),  # User banks are writable
+            is_loaded=True
+        )

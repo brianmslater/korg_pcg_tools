@@ -1,0 +1,4 @@
+# file: /Users/bmslater/Documents/projects/korg_pcg_tools/pcg_tools/bank_creator.py
+# hypothesis_version: 6.141.1
+
+[b'\x00', b'\x00\x00\x00\x00', b'PBK1', b'PRG1', 128, 4960, 131072, '>I', 'A', 'HD-1', 'Program', 'Single', 'U-', 'ascii']

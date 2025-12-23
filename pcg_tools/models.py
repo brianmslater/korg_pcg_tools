@@ -5,6 +5,68 @@ from typing import List, Optional
 from enum import Enum
 
 
+class OsVersion(Enum):
+    """Kronos OS version enum.
+    
+    Based on C# Models.EOsVersion in Models.cs.
+    Different OS versions have different offsets and chunk types.
+    """
+    KRONOS_10_11 = "1.0/1.1"  # Original Kronos OS
+    KRONOS_15_16 = "1.5/1.6"  # Added PBK2/CBK2/STL2 chunks
+    KRONOS_2X = "2.x"         # Extended user banks U-AA to U-GG
+    KRONOS_3X = "3.x"         # Added Color parameter to setlist slots
+    OASYS = "Oasys"           # Korg Oasys
+    KROME = "Krome"
+    KROME_EX = "Krome EX"
+    KROSS = "Kross"
+    KROSS_2 = "Kross 2"
+    M3_1X = "M3 1.x"
+    M3_20 = "M3 2.0"
+    M50 = "M50"
+    TRITON_EXTREME = "Triton Extreme"
+    TRITON_CLASSIC = "Triton Classic/Studio/Rack"
+    TRITON_LE = "Triton LE"
+    TRITON_KARMA = "Triton Karma"
+    UNKNOWN = "Unknown"
+
+
+class SynthesisType(Enum):
+    """Program synthesis type enum.
+    
+    Based on C# ProgramBank.SynthesisType in ProgramBank.cs.
+    Used to categorize programs by their sound engine.
+    """
+    # Sampled types
+    AI = "AI"           # M1 sample engine, Advanced Integrated
+    AI2 = "AI2"         # Advanced Integrated 2
+    ACCESS = "Access"   # Trinity Sample engine
+    HI = "Hi"           # Triton/Karma Sample engine
+    EDS = "EDS"         # M3/M50 Sample engine
+    EDSI = "EDSi"       # MicroStation Sample engine
+    EDSX = "EDSx"       # Krome (EX)/Kross(2) Sample engine
+    HD1 = "HD-1"        # Kronos/Oasys Sample engine
+    
+    # Modeled types
+    ANALOG_MODELING = "Analog Modeling"  # MS2000, MicroKorg
+    MMT = "MMT"                           # MicroKorg XL (Plus)
+    MOSS_Z1 = "MOSS-Z1"                   # Trinity option MOSS-TRI
+    RADIAS = "Radias"                     # M3 option
+    EXI = "EXi"                           # Oasys/Kronos modeled engine
+    
+    UNKNOWN = "Unknown"  # Unknown; Used for Oasys/Kronos where synthesis type is dynamic
+    
+    @classmethod
+    def is_modeled(cls, synthesis_type: 'SynthesisType') -> bool:
+        """Check if synthesis type is modeled (vs sampled).
+        
+        Based on C# Program.IsModeled().
+        """
+        modeled_types = {
+            cls.ANALOG_MODELING, cls.MMT, cls.MOSS_Z1, cls.RADIAS, cls.EXI
+        }
+        return synthesis_type in modeled_types
+
+
 def format_bank_id_for_display(bank_id: str) -> str:
     """Format bank ID for display to match Kronos hardware.
     
@@ -125,7 +187,7 @@ class PcgHeader:
     major_version: int
     minor_version: int
     model: WorkstationModel
-    os_version: Optional[str] = None
+    os_version: OsVersion = OsVersion.UNKNOWN
 
 
 @dataclass
@@ -150,16 +212,53 @@ class Program:
     raw_data: bytes = b''
     _raw_offset: int = 0  # Track offset in file for writing back
     
+    # Name length constant (matches C# MaxNameLength)
+    NAME_LENGTH: int = 24
+    
     @property
     def id(self) -> str:
         """Return program ID like 'INT-A000'."""
         display_bank = format_bank_id_for_display(self.bank)
         return f"{display_bank}{self.index:03d}"
+    
+    def calc_crc(self, including_name: bool = True) -> int:
+        """Calculate CRC value for patch comparison.
+        
+        Based on C# Patch.CalcCrc().
+        Sums all bytes and returns modulo 65536.
+        
+        Args:
+            including_name: If True, include name bytes in CRC.
+                           If False, skip first NAME_LENGTH bytes.
+        
+        Returns:
+            CRC value (0-65535)
+        """
+        if not self.raw_data:
+            return 0
+        
+        start = 0 if including_name else self.NAME_LENGTH
+        value = sum(self.raw_data[start:])
+        return value % (1 << 16)
+    
+    @property
+    def byte_offset(self) -> int:
+        """Return byte offset in file (for hex export)."""
+        return self._raw_offset
+    
+    @property
+    def byte_length(self) -> int:
+        """Return byte length of patch data (for hex export)."""
+        return len(self.raw_data) if self.raw_data else 0
 
 
 @dataclass
 class Timbre:
-    """Timbre within a combi."""
+    """Timbre within a combi.
+    
+    Based on C# KronosTimbre.cs and KronosOasysTimbre.cs.
+    Timbre size: 188 bytes (TimbresSizeConstant).
+    """
     program_bank: str
     program_index: int
     midi_channel: int
@@ -167,16 +266,17 @@ class Timbre:
     volume: int = 127
     pan: int = 64
     mute: bool = False
-    priority: bool = False  # Priority flag
-    detune: int = 0  # Detune in cents (signed, -1200 to +1200)
-    transpose: int = 0  # Transpose in semitones (signed, -24 to +24)
-    portamento: int = 0  # Portamento (signed, -128 to +127)
-    osc_mode: str = "Prg"  # Oscillator mode: Prg, Poly, Mono, Legato
-    osc_select: str = "Both"  # Oscillator select: Both, Osc1, Osc2
-    bottom_key: int = 0  # Bottom key of zone (0-127, C-1 to G9)
-    top_key: int = 127  # Top key of zone (0-127, C-1 to G9)
-    bottom_velocity: int = 1  # Bottom velocity (1-127)
-    top_velocity: int = 127  # Top velocity (1-127)
+    priority: bool = False  # Priority flag (offset +35, bit 4)
+    bend_range: int = 0  # Bend range in semitones (offset +6, signed, -24 to +24)
+    detune: int = 0  # Detune in cents (offset +8, 2 bytes, signed, -1200 to +1200)
+    transpose: int = 0  # Transpose in semitones (offset +7, signed, -24 to +24)
+    portamento: int = 0  # Portamento (offset +36, signed, -128 to +127)
+    osc_mode: str = "Prg"  # Oscillator mode: Prg, Poly, Mono, Legato (offset +35, bits 1-0)
+    osc_select: str = "Both"  # Oscillator select: Both, Osc1, Osc2 (offset +35, bits 3-2)
+    bottom_key: int = 0  # Bottom key of zone (offset +38, 0-127, C-1 to G9)
+    top_key: int = 127  # Top key of zone (offset +37, 0-127, C-1 to G9)
+    bottom_velocity: int = 1  # Bottom velocity (offset +41, 1-127)
+    top_velocity: int = 127  # Top velocity (offset +40, 1-127)
     
     @property
     def program_id(self) -> str:
@@ -198,11 +298,44 @@ class Combi:
     raw_data: bytes = b''
     _raw_offset: int = 0  # Track offset in file for writing back
     
+    # Name length constant (matches C# MaxNameLength)
+    NAME_LENGTH: int = 24
+    
     @property
     def id(self) -> str:
         """Return combi ID like 'INT-A000'."""
         display_bank = format_bank_id_for_display(self.bank)
         return f"{display_bank}{self.index:03d}"
+    
+    def calc_crc(self, including_name: bool = True) -> int:
+        """Calculate CRC value for patch comparison.
+        
+        Based on C# Patch.CalcCrc().
+        Sums all bytes and returns modulo 65536.
+        
+        Args:
+            including_name: If True, include name bytes in CRC.
+                           If False, skip first NAME_LENGTH bytes.
+        
+        Returns:
+            CRC value (0-65535)
+        """
+        if not self.raw_data:
+            return 0
+        
+        start = 0 if including_name else self.NAME_LENGTH
+        value = sum(self.raw_data[start:])
+        return value % (1 << 16)
+    
+    @property
+    def byte_offset(self) -> int:
+        """Return byte offset in file (for hex export)."""
+        return self._raw_offset
+    
+    @property
+    def byte_length(self) -> int:
+        """Return byte length of patch data (for hex export)."""
+        return len(self.raw_data) if self.raw_data else 0
 
 
 @dataclass
@@ -222,6 +355,7 @@ class SetListSlot:
     color: int = 0  # Color value (byte from STL1/SBK1 at +24)
     raw_data: Optional[bytearray] = None  # Raw slot data for bit-level operations
     _text_size: int = 2  # Internal storage, default to M (2)
+    _raw_offset: int = 0  # Track offset in file for hex export
     
     @property
     def id(self) -> str:
@@ -480,6 +614,16 @@ class SetListSlot:
             desc_bytes = desc_bytes.ljust(512, b'\x00')
             # Write to raw data
             self.raw_data[30:542] = desc_bytes
+    
+    @property
+    def byte_offset(self) -> int:
+        """Return byte offset in file (for hex export)."""
+        return self._raw_offset
+    
+    @property
+    def byte_length(self) -> int:
+        """Return byte length of slot data (for hex export)."""
+        return len(self.raw_data) if self.raw_data else 0
 
 
 @dataclass
@@ -508,6 +652,22 @@ class Bank:
     
     def __len__(self):
         return len(self.patches)
+    
+    @property
+    def is_filled(self) -> bool:
+        """Check if bank has any non-empty patches.
+        
+        Based on C# IsFilled property.
+        """
+        if not self.patches:
+            return False
+        for patch in self.patches:
+            # Check if patch has a non-empty name
+            if hasattr(patch, 'name') and patch.name:
+                name = patch.name.strip()
+                if name and not name.startswith("Init") and not name.startswith("[Empty"):
+                    return True
+        return False
 
 
 @dataclass
@@ -517,8 +677,12 @@ class PcgFile:
     program_banks: List[Bank] = field(default_factory=list)
     combi_banks: List[Bank] = field(default_factory=list)
     set_lists: List[SetList] = field(default_factory=list)
+    drum_kit_banks: List['DrumKitBank'] = field(default_factory=list)
+    wave_sequence_banks: List['WaveSequenceBank'] = field(default_factory=list)
     has_global: bool = False
     has_set_lists: bool = False
+    has_drum_kits: bool = False
+    has_wave_sequences: bool = False
     raw_data: bytes = b''
     is_dirty: bool = False
     _reference_tracker: Optional[object] = field(default=None, init=False, repr=False)
@@ -576,3 +740,190 @@ class PcgFile:
     def is_program_used(self, program_id: str) -> bool:
         """Check if a program is used by any combi."""
         return self.get_reference_tracker().is_program_used(program_id)
+    
+    def get_program_bank(self, bank_id: str) -> Optional[Bank]:
+        """Get a program bank by ID."""
+        for bank in self.program_banks:
+            if bank.bank_id == bank_id:
+                return bank
+        return None
+    
+    def get_combi_bank(self, bank_id: str) -> Optional[Bank]:
+        """Get a combi bank by ID."""
+        for bank in self.combi_banks:
+            if bank.bank_id == bank_id:
+                return bank
+        return None
+    
+    def has_program_bank(self, bank_id: str) -> bool:
+        """Check if a program bank exists."""
+        return self.get_program_bank(bank_id) is not None
+    
+    def has_combi_bank(self, bank_id: str) -> bool:
+        """Check if a combi bank exists."""
+        return self.get_combi_bank(bank_id) is not None
+    
+    def get_available_user_banks(self, bank_type: str = 'Program') -> List[str]:
+        """Get list of user bank IDs that exist in this file.
+        
+        Args:
+            bank_type: 'Program' or 'Combi'
+        
+        Returns:
+            List of bank IDs like ['U-A', 'U-B', 'U-AA']
+        """
+        banks = self.program_banks if bank_type == 'Program' else self.combi_banks
+        return [b.bank_id for b in banks if b.bank_id.startswith('U-')]
+    
+    def get_all_bank_ids(self, bank_type: str = 'Program') -> List[str]:
+        """Get list of all bank IDs in this file.
+        
+        Args:
+            bank_type: 'Program' or 'Combi'
+        
+        Returns:
+            List of bank IDs
+        """
+        banks = self.program_banks if bank_type == 'Program' else self.combi_banks
+        return [b.bank_id for b in banks]
+
+
+# Helper functions for bank ID conversion
+
+def parse_bank_id(display_id: str) -> str:
+    """Convert display bank ID to internal format.
+    
+    Examples:
+        INT-A -> I-A
+        USER-A -> U-A
+        GM -> GM
+    """
+    if display_id.startswith("INT-"):
+        return "I-" + display_id[4:]
+    elif display_id.startswith("USER-"):
+        return "U-" + display_id[5:]
+    return display_id
+
+
+def get_user_bank_list() -> List[str]:
+    """Get list of all possible Kronos user bank IDs.
+    
+    Returns:
+        List of bank IDs: U-A through U-G, U-AA through U-GG
+    """
+    banks = []
+    # Single letter banks: U-A through U-G
+    for i in range(7):
+        banks.append(f"U-{chr(65 + i)}")
+    # Double letter banks: U-AA through U-GG
+    for i in range(7):
+        letter = chr(65 + i)
+        banks.append(f"U-{letter}{letter}")
+    return banks
+
+
+def get_all_program_bank_ids() -> List[str]:
+    """Get list of all possible Kronos program bank IDs.
+    
+    Based on C# KronosProgramBanks.CreateBanks() which creates all banks upfront.
+    
+    Returns:
+        List of bank IDs in order: I-A to I-F, U-A to U-G, U-AA to U-GG
+    """
+    banks = []
+    # Internal banks: I-A through I-F
+    for i in range(6):
+        banks.append(f"I-{chr(65 + i)}")
+    # User banks: U-A through U-G
+    for i in range(7):
+        banks.append(f"U-{chr(65 + i)}")
+    # Extended user banks: U-AA through U-GG
+    for i in range(7):
+        letter = chr(65 + i)
+        banks.append(f"U-{letter}{letter}")
+    return banks
+
+
+def get_all_combi_bank_ids() -> List[str]:
+    """Get list of all possible Kronos combi bank IDs.
+    
+    Based on C# KronosCombiBanks.CreateBanks() which creates all banks upfront.
+    
+    Returns:
+        List of bank IDs in order: I-A to I-G, U-A to U-G
+    """
+    banks = []
+    # Internal banks: I-A through I-G
+    for i in range(7):
+        banks.append(f"I-{chr(65 + i)}")
+    # User banks: U-A through U-G
+    for i in range(7):
+        banks.append(f"U-{chr(65 + i)}")
+    return banks
+
+
+
+@dataclass
+class DrumKit:
+    """Drum kit data.
+    
+    Based on C# DrumKit.cs and KronosDrumKit.cs.
+    """
+    bank: str
+    index: int
+    name: str
+    raw_data: bytes = b''
+    _raw_offset: int = 0
+    
+    @property
+    def id(self) -> str:
+        """Return drum kit ID like 'INT-A000'."""
+        display_bank = format_bank_id_for_display(self.bank)
+        return f"{display_bank}{self.index:03d}"
+
+
+@dataclass
+class DrumKitBank:
+    """Drum kit bank container.
+    
+    Based on C# DrumKitBank.cs.
+    """
+    bank_id: str
+    drum_kits: List[DrumKit] = field(default_factory=list)
+    byte_offset: int = 0
+    patch_size: int = 0
+    is_writable: bool = True
+    is_loaded: bool = False
+
+
+@dataclass
+class WaveSequence:
+    """Wave sequence data.
+    
+    Based on C# WaveSequence.cs and KronosWaveSequence.cs.
+    """
+    bank: str
+    index: int
+    name: str
+    raw_data: bytes = b''
+    _raw_offset: int = 0
+    
+    @property
+    def id(self) -> str:
+        """Return wave sequence ID like 'INT-A000'."""
+        display_bank = format_bank_id_for_display(self.bank)
+        return f"{display_bank}{self.index:03d}"
+
+
+@dataclass
+class WaveSequenceBank:
+    """Wave sequence bank container.
+    
+    Based on C# WaveSequenceBank.cs.
+    """
+    bank_id: str
+    wave_sequences: List[WaveSequence] = field(default_factory=list)
+    byte_offset: int = 0
+    patch_size: int = 0
+    is_writable: bool = True
+    is_loaded: bool = False

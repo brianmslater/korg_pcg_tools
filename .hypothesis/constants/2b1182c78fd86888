@@ -1,0 +1,4 @@
+# file: /Users/bmslater/Documents/projects/korg_pcg_tools/pcg_tools/checksum.py
+# hypothesis_version: 6.141.1
+
+[b'CBK1', b'CMB1', b'DBK1', b'DIV1', b'DKT1', b'GLB1', b'INI2', b'INI3', b'MBK1', b'PBK1', b'PCG1', b'PRG1', b'SBK1', b'SLS1', b'STL1', b'WBK1', b'WSQ1', 100, 127, 255, 256, 65536, '>I', 'CBK1', 'DBK1', 'MBK1', 'PBK1', 'SBK1', 'SLS1', 'WBK1', 'ascii', 'replace']

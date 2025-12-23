@@ -1,0 +1,4 @@
+# file: /Users/bmslater/Documents/projects/korg_pcg_tools/pcg_tools/models.py
+# hypothesis_version: 6.141.1
+
+[b'\x00', 120.0, 127, 136, 137, 140, 144, 148, 152, 153, 156, 157, 160, 164, 165, 168, 172, 174, 176, 180, 181, 184, 188, 196, 512, 542, 'Azure', 'Both', 'Brick', 'Burgundy', 'Cacao', 'Charcoal', 'Combi', 'Default', 'Denim', 'Gold', 'I-', 'INT-', 'Indigo', 'Ivy', 'Korg Karma', 'Korg Krome', 'Korg Kronos', 'Korg Kronos X', 'Korg M3', 'Korg M50', 'Korg Oasys', 'Korg Trinity', 'Korg Triton', 'Korg Triton Extreme', 'Korg Triton LE', 'Korg Triton Studio', 'Lavender', 'Navy', 'None', 'Olive', 'Prg', 'Program', 'Rose', 'Silver', 'Slate', 'Song', 'U-', 'USER-', 'ascii', 'ignore']

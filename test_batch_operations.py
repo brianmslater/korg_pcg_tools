@@ -1,8 +1,26 @@
 #!/usr/bin/env python3
 """Test batch operations functionality."""
 
+import pytest
+import os
+
+TEST_FILE = "files_2_test/nw.PCG"
+TEST_FILE_EXISTS = os.path.exists(TEST_FILE)
+
 from pcg_tools.reader import read_pcg_file
+import pytest
+import os
+
+TEST_FILE = "files_2_test/nw.PCG"
+TEST_FILE_EXISTS = os.path.exists(TEST_FILE)
+
 from pcg_tools.writer import write_pcg_file
+import pytest
+import os
+
+TEST_FILE = "files_2_test/nw.PCG"
+TEST_FILE_EXISTS = os.path.exists(TEST_FILE)
+
 from pcg_tools.batch_operations import BatchOperations
 
 def test_batch_operations():
@@ -10,7 +28,7 @@ def test_batch_operations():
     
     # Read test file
     print("Reading test file...")
-    pcg = read_pcg_file("test_files/soundcheck_BASE_FOR_TESTING.PCG")
+    pcg = read_pcg_file("files_2_test/nw.PCG")
     
     bank = pcg.program_banks[0]
     print(f"\nBank: {bank.bank_id}")
@@ -75,7 +93,7 @@ def test_batch_operations():
     print(f"  {before_compact} → {after_compact}")
     
     # Save result
-    output_file = "test_files/soundcheck_BATCH_OPS_TEST.PCG"
+    output_file = "files_2_test/soundcheck_BATCH_OPS_TEST.PCG"
     write_pcg_file(pcg, output_file)
     print(f"\n✓ Saved to {output_file}")
     

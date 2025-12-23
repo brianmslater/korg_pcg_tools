@@ -1,0 +1,4 @@
+# file: /Users/bmslater/Documents/projects/korg_pcg_tools/pcg_tools/patch_sorting.py
+# hypothesis_version: 6.141.1
+
+['-', '---', 'category', 'init', 'init combi', 'init program', 'initialized', 'name', 'subcategory']

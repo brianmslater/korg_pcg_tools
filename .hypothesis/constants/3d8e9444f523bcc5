@@ -1,0 +1,4 @@
+# file: /Users/bmslater/Documents/projects/korg_pcg_tools/pcg_tools/structure_validator.py
+# hypothesis_version: 6.141.1
+
+[b'\x00', 100, 127, 128, 256, 10000, 32768, 65535, 131072, '100-10000', '<= 128', '<h', '>H', '>I', 'File header', 'GM', 'I-F', 'Invalid chunk ID', 'Issues:', 'Krome', 'Krome EX', 'Kronos', 'Kross', 'Kross 2', 'M3', 'Oasys', 'PCG1', 'Triton', 'Unusual program size', 'ascii', 'bank_id', 'bank_name', 'combi_size', 'detune', 'error', 'ignore', 'info', 'midi_channel', 'missing', 'num_combis', 'num_programs', 'program_bank', 'program_index', 'program_size', 'rb', 'status', 'transpose', 'valid', 'volume', 'warning']
