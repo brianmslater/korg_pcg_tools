@@ -1083,6 +1083,14 @@ class PcgMainWindow(QMainWindow):
                 # Update status bar counts
                 new_win._update_status_bar_counts()
                 
+                # Offset window position based on number of open windows
+                # so they don't stack exactly on top of each other
+                window_count = len(PcgMainWindow._open_windows)
+                if window_count > 1:
+                    offset = (window_count - 1) * 30
+                    current_pos = new_win.pos()
+                    new_win.move(current_pos.x() + offset, current_pos.y() + offset)
+                
                 new_win.show()
                 
             except Exception as e:
@@ -3134,12 +3142,14 @@ class PcgMainWindow(QMainWindow):
             # Paste the program
             clipboard.paste_program(target_program)
             
-            QMessageBox.information(
-                self,
-                "Pasted",
-                f"Pasted program to '{target_program.id}'\n"
-                f"Name: {target_program.name}"
-            )
+            # Check for user sample warning
+            user_sample_warning = clipboard.get_user_sample_warning()
+            
+            msg = f"Pasted program to '{target_program.id}'\nName: {target_program.name}"
+            if user_sample_warning:
+                msg += f"\n\n⚠️ {user_sample_warning}"
+            
+            QMessageBox.information(self, "Pasted", msg)
             
             # Mark as dirty and refresh
             self.mark_dirty()
@@ -3179,21 +3189,20 @@ class PcgMainWindow(QMainWindow):
             # Paste the combi
             program_remap = clipboard.paste_combi(target_combi, self.pcg, remap_programs)
             
+            # Check for user sample warning
+            user_sample_warning = clipboard.get_user_sample_warning()
+            
             # Show results
             if program_remap:
                 remap_msg = "\n".join([f"  {old} → {new}" for old, new in program_remap.items()])
-                QMessageBox.information(
-                    self,
-                    "Pasted",
-                    f"Pasted combi to '{target_combi.id}'\n\n"
-                    f"Program remapping:\n{remap_msg}"
-                )
+                msg = f"Pasted combi to '{target_combi.id}'\n\nProgram remapping:\n{remap_msg}"
             else:
-                QMessageBox.information(
-                    self,
-                    "Pasted",
-                    f"Pasted combi to '{target_combi.id}'"
-                )
+                msg = f"Pasted combi to '{target_combi.id}'"
+            
+            if user_sample_warning:
+                msg += f"\n\n⚠️ {user_sample_warning}"
+            
+            QMessageBox.information(self, "Pasted", msg)
             
             # Mark as dirty and refresh
             self.mark_dirty()

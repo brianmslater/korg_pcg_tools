@@ -16,6 +16,52 @@ class CopyType(Enum):
     WAVE_SEQUENCES = "WaveSequences"
 
 
+def program_may_use_user_samples(program: Program) -> bool:
+    """Check if a program might use user samples.
+    
+    User samples are stored in KSC files and must be loaded separately.
+    Programs from User banks (U-A through U-GG) are more likely to use user samples.
+    HD-1 programs can reference user multisamples.
+    
+    Returns True if the program might use user samples that need to be loaded separately.
+    """
+    if not program or not program.id:
+        return False
+    
+    # Check if program is from a User bank (more likely to use user samples)
+    prog_id = program.id
+    if prog_id.startswith("U-") or prog_id.startswith("USER-"):
+        return True
+    
+    return False
+
+
+def get_user_sample_warning(programs: List[Program]) -> Optional[str]:
+    """Get a warning message if any programs might use user samples.
+    
+    Returns a warning string if user samples might be needed, None otherwise.
+    """
+    user_sample_programs = []
+    for prog in programs:
+        if program_may_use_user_samples(prog):
+            user_sample_programs.append(prog.name if prog.name else prog.id)
+    
+    if not user_sample_programs:
+        return None
+    
+    if len(user_sample_programs) == 1:
+        return (f"The program '{user_sample_programs[0]}' may use user samples.\n\n"
+                "User samples are stored in KSC files and must be loaded on the "
+                "destination Kronos for the program to sound correct.")
+    else:
+        prog_list = ", ".join(user_sample_programs[:5])
+        if len(user_sample_programs) > 5:
+            prog_list += f" and {len(user_sample_programs) - 5} more"
+        return (f"The following programs may use user samples:\n{prog_list}\n\n"
+                "User samples are stored in KSC files and must be loaded on the "
+                "destination Kronos for these programs to sound correct.")
+
+
 class ClipBoardPatch:
     """Wrapper for a copied patch with tracking info."""
     def __init__(self, patch, data: bytes = None):
@@ -52,6 +98,24 @@ class Clipboard:
         self.copy_file_name: Optional[str] = None
         self.paste_pcg_memory = None
         self._previous_clipboard: Optional['Clipboard'] = None
+
+    def get_user_sample_warning(self) -> Optional[str]:
+        """Get a warning if clipboard contents might use user samples.
+        
+        Returns a warning message if programs in the clipboard might use user samples,
+        None otherwise.
+        """
+        programs_to_check = []
+        
+        # Check single program
+        if self.program:
+            programs_to_check.append(self.program)
+        
+        # Check programs from combi
+        if self.programs:
+            programs_to_check.extend(self.programs)
+        
+        return get_user_sample_warning(programs_to_check)
 
     @property
     def selected_copy_type(self) -> CopyType:
